@@ -1,4 +1,3 @@
-
 export enum TemplateID {
   Minimal = 'minimal',
   Colorful = 'colorful',

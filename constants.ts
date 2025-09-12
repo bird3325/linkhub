@@ -1,4 +1,3 @@
-
 import type { User, Link, AnalyticsData } from './types';
 import { TemplateID, LinkStyle } from './types';
 
@@ -10,7 +9,7 @@ export const MOCK_USER: User = {
   name: '김링크',
   phone: '010-1234-5678',
   email: 'kimlink@example.com',
-  bio: '🙋‍♀️ 안녕하세요! 크리에이터 김링크입니다',
+  bio: '🙋♀️ 안녕하세요! 크리에이터 김링크입니다',
   avatar: 'https://picsum.photos/id/237/200/200',
   template: TemplateID.Glass,
 };
@@ -81,8 +80,8 @@ export const MOCK_ANALYTICS: AnalyticsData = {
 };
 
 export const TEMPLATES = [
-    { id: TemplateID.Minimal, name: '미니멀' },
-    { id: TemplateID.Colorful, name: '컬러풀' },
-    { id: TemplateID.Dark, name: '다크' },
-    { id: TemplateID.Glass, name: '글래스' },
+  { id: TemplateID.Minimal, name: '미니멀' },
+  { id: TemplateID.Colorful, name: '컬러풀' },
+  { id: TemplateID.Dark, name: '다크' },
+  { id: TemplateID.Glass, name: '글래스' },
 ];

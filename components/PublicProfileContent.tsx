@@ -7,15 +7,26 @@ interface PublicProfileContentProps {
     user: User;
     links: Link[];
     isPreview?: boolean;
+    onLinkClick?: (link: Link) => void; // 링크 클릭 추적을 위한 콜백 추가
 }
 
-const LinkBlock: React.FC<{ link: Link, styles: any, isPreview: boolean, onClick: (e: React.MouseEvent, url: string) => void, layout: 'list' | 'grid' }> = ({ link, styles, isPreview, onClick, layout }) => {
+const LinkBlock: React.FC<{ 
+    link: Link, 
+    styles: any, 
+    isPreview: boolean, 
+    onClick: (e: React.MouseEvent, link: Link) => void, 
+    layout: 'list' | 'grid' 
+}> = ({ link, styles, isPreview, onClick, layout }) => {
     
     const baseClasses = `block w-full font-semibold rounded-lg transition-transform transform flex items-center justify-center text-center ${!isPreview ? 'hover:scale-105' : ''} ${!link.isActive && isPreview ? 'opacity-50' : ''}`;
 
     if (layout === 'grid' && isPreview) {
         return (
-             <a href={link.url} onClick={(e) => onClick(e, link.url)} className={`${baseClasses} ${styles.linkBg} ${styles.linkText} ${styles.linkBorder} aspect-square flex-col text-xs p-1`}>
+             <a 
+                href={link.url} 
+                onClick={(e) => onClick(e, link)} 
+                className={`${baseClasses} ${styles.linkBg} ${styles.linkText} ${styles.linkBorder} aspect-square flex-col text-xs p-1`}
+             >
                  {link.imageUrl ? (
                     <img src={link.imageUrl} alt={link.title} className="w-8 h-8 rounded-md object-cover mb-1" />
                  ) : (
@@ -28,11 +39,14 @@ const LinkBlock: React.FC<{ link: Link, styles: any, isPreview: boolean, onClick
         )
     }
 
-
     switch (link.style) {
         case LinkStyle.THUMBNAIL:
             return (
-                <a href={link.url} onClick={(e) => onClick(e, link.url)} className={`${baseClasses} ${styles.linkBg} ${styles.linkText} ${styles.linkBorder} justify-start p-3`}>
+                <a 
+                    href={link.url} 
+                    onClick={(e) => onClick(e, link)} 
+                    className={`${baseClasses} ${styles.linkBg} ${styles.linkText} ${styles.linkBorder} justify-start p-3`}
+                >
                     {link.imageUrl ? (
                        <img src={link.imageUrl} alt={link.title} className="w-10 h-10 rounded-md object-cover flex-shrink-0" />
                     ) : (
@@ -44,14 +58,23 @@ const LinkBlock: React.FC<{ link: Link, styles: any, isPreview: boolean, onClick
         
         case LinkStyle.CARD:
              return (
-                <a href={link.url} onClick={(e) => onClick(e, link.url)} className={`${baseClasses} bg-white/80 backdrop-blur-sm border border-gray-200/50 text-gray-800 shadow-md p-3`}>
+                <a 
+                    href={link.url} 
+                    onClick={(e) => onClick(e, link)} 
+                    className={`${baseClasses} bg-white/80 backdrop-blur-sm border border-gray-200/50 text-gray-800 shadow-md p-3`}
+                >
                     <span>{link.title}</span>
                 </a>
             );
         
         case LinkStyle.BACKGROUND:
             return (
-                 <a href={link.url} onClick={(e) => onClick(e, link.url)} className={`${baseClasses} h-20 bg-cover bg-center text-white font-bold text-lg relative overflow-hidden p-3`} style={link.imageUrl ? { backgroundImage: `url(${link.imageUrl})` } : {}}>
+                 <a 
+                    href={link.url} 
+                    onClick={(e) => onClick(e, link)} 
+                    className={`${baseClasses} h-20 bg-cover bg-center text-white font-bold text-lg relative overflow-hidden p-3`} 
+                    style={link.imageUrl ? { backgroundImage: `url(${link.imageUrl})` } : {}}
+                 >
                     {!link.imageUrl && <div className={`absolute inset-0 ${styles.linkBg}`}></div>}
                     <div className="absolute inset-0 bg-black/30"></div>
                     <span className="relative z-10">{link.title}</span>
@@ -61,15 +84,23 @@ const LinkBlock: React.FC<{ link: Link, styles: any, isPreview: boolean, onClick
         case LinkStyle.SIMPLE:
         default:
             return (
-                <a href={link.url} onClick={(e) => onClick(e, link.url)} className={`${baseClasses} ${styles.linkBg} ${styles.linkText} ${styles.linkBorder} p-3`}>
+                <a 
+                    href={link.url} 
+                    onClick={(e) => onClick(e, link)} 
+                    className={`${baseClasses} ${styles.linkBg} ${styles.linkText} ${styles.linkBorder} p-3`}
+                >
                     <span>{link.title}</span>
                 </a>
             );
     }
 };
 
-
-const PublicProfileContent: React.FC<PublicProfileContentProps> = ({ user, links, isPreview = false }) => {
+const PublicProfileContent: React.FC<PublicProfileContentProps> = ({ 
+    user, 
+    links, 
+    isPreview = false,
+    onLinkClick // 링크 클릭 콜백 추가
+}) => {
     const [previewLayout, setPreviewLayout] = useState<'list' | 'grid'>('list');
     const [sortOrder, setSortOrder] = useState<'default' | 'latest' | 'clicks'>('default');
     const [sortMenuOpen, setSortMenuOpen] = useState(false);
@@ -142,12 +173,23 @@ const PublicProfileContent: React.FC<PublicProfileContentProps> = ({ user, links
 
     const styles = templateStyles[user.template] || templateStyles[TemplateID.Minimal];
 
-    const linkClickHandler = (e: React.MouseEvent, url: string) => {
+    // 링크 클릭 핸들러 수정 - 추적 기능 추가
+    const linkClickHandler = (e: React.MouseEvent, link: Link) => {
         if (isPreview) {
             e.preventDefault();
             return;
         }
-        window.open(url, '_blank', 'noopener,noreferrer');
+
+        // 링크 클릭 추적 콜백 호출
+        if (onLinkClick) {
+            onLinkClick(link);
+        }
+
+        // 새 창에서 링크 열기
+        window.open(link.url, '_blank', 'noopener,noreferrer');
+        
+        // 기본 링크 동작 방지 (새 창에서 열기 때문에)
+        e.preventDefault();
     }
 
     const linkContainerClasses = isPreview && previewLayout === 'grid' ? 'grid grid-cols-3 gap-2' : 'space-y-3';
@@ -219,7 +261,14 @@ const PublicProfileContent: React.FC<PublicProfileContentProps> = ({ user, links
 
             <div className={`w-full max-w-sm md:max-w-md mx-auto mt-6 ${linkContainerClasses}`}>
                 {sortedLinks.filter(l => l.isActive || isPreview).map(link => (
-                   <LinkBlock key={link.id} link={link} styles={styles} isPreview={isPreview} onClick={linkClickHandler} layout={previewLayout} />
+                   <LinkBlock 
+                        key={link.id} 
+                        link={link} 
+                        styles={styles} 
+                        isPreview={isPreview} 
+                        onClick={linkClickHandler} 
+                        layout={previewLayout} 
+                    />
                 ))}
             </div>
         </div>

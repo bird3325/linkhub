@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { MOCK_USER, TEMPLATES } from '../constants';
@@ -6,15 +6,26 @@ import type { User, Link as TLink, TemplateID } from '../types';
 import { PlusIcon, DragHandleIcon, EditIcon, ExternalLinkIcon } from '../components/icons/Icons';
 import PublicProfileContent from '../components/PublicProfileContent';
 import { LinkContext } from '../contexts/LinkContext';
+import { AuthContext } from '../contexts/AuthContext';
 import Toggle from '../components/Toggle';
+import { VisitorTracker } from '../utils/analytics';
 
 const DashboardPage: React.FC = () => {
     const [user, setUser] = useState<User>(MOCK_USER);
     const { links, setLinks } = useContext(LinkContext);
+    const { user: authUser } = useContext(AuthContext);
     const navigate = useNavigate();
     
     const dragItem = React.useRef<number | null>(null);
     const dragOverItem = React.useRef<number | null>(null);
+
+    // 방문자 추적 로그 기록 - 로그인한 사용자 정보 기록
+    useEffect(() => {
+        if (authUser) {
+            console.log('대시보드 방문 로그 기록 (로그인 사용자):', authUser);
+            VisitorTracker.logVisit('/dashboard', undefined, true);
+        }
+    }, [authUser]);
 
     const handleSort = () => {
         if(dragItem.current === null || dragOverItem.current === null) return;
@@ -100,7 +111,6 @@ const DashboardPage: React.FC = () => {
                                 ))}
                             </div>
                         </div>
-
                     </div>
 
                     {/* Right - Preview */}

@@ -9,14 +9,12 @@ import { LinkContext } from '../contexts/LinkContext';
 import { AuthContext } from '../contexts/AuthContext';
 import Toggle from '../components/Toggle';
 import { VisitorTracker } from '../utils/analytics';
-
-// ProfileService import 수정 - 실제 파일 위치에 맞게 조정
-// import { ProfileService } from '../services/profileService';  // services 폴더에 있다면
-// import { ProfileService } from '../utils/profileService';     // utils 폴더에 있다면
+import { LinkService } from '../utils/linkService';
 
 const DashboardPage: React.FC = () => {
     const [user, setUser] = useState<User>(MOCK_USER);
-    const [profileLoading, setProfileLoading] = useState(false); // true -> false로 임시 변경
+    const [profileLoading, setProfileLoading] = useState(false);
+    const [linksLoading, setLinksLoading] = useState(true);
     const { links, setLinks } = useContext(LinkContext);
     const { user: authUser } = useContext(AuthContext);
     const navigate = useNavigate();
@@ -32,47 +30,55 @@ const DashboardPage: React.FC = () => {
         }
     }, [authUser]);
 
-    // 프로필 정보 로드 - 임시로 주석 처리
-    /*
+    // 링크 데이터 로드
     useEffect(() => {
-        const loadProfileData = async () => {
+        const loadLinks = async () => {
             if (!authUser?.id) {
-                setProfileLoading(false);
+                setLinksLoading(false);
                 return;
             }
+
             try {
-                const result = await ProfileService.getProfile(authUser.id);
-                if (result.success && result.profile) {
-                    setUser(prevUser => ({
-                        ...prevUser,
-                        displayName: result.profile.displayName || prevUser.displayName,
-                        username: result.profile.username || prevUser.username,
-                        bio: result.profile.bio || prevUser.bio,
-                        avatar: result.profile.avatar || prevUser.avatar,
-                    }));
-                    console.log('프로필 정보 로드됨:', result.profile);
+                const googleLinks = await LinkService.getLinks(authUser.id);
+                if (googleLinks && googleLinks.length > 0) {
+                    setLinks(googleLinks);
                 } else {
-                    console.log('프로필 정보가 없음, 기본값 사용');
+                    console.log('구글 시트에 링크가 없음, 기본 링크 사용');
                 }
             } catch (error) {
-                console.warn('프로필 정보 로드 실패:', error);
+                console.warn('링크 로드 실패:', error);
             } finally {
-                setProfileLoading(false);
+                setLinksLoading(false);
             }
         };
-        loadProfileData();
-    }, [authUser]);
-    */
 
-    const handleSort = () => {
-        if(dragItem.current === null || dragOverItem.current === null) return;
+        loadLinks();
+    }, [authUser, setLinks]);
+
+    const handleSort = async () => {
+        if(dragItem.current === null || dragOverItem.current === null || !authUser?.id) return;
+        
         let _links = [...links];
         const draggedItemContent = _links.splice(dragItem.current, 1)[0];
         _links.splice(dragOverItem.current, 0, draggedItemContent);
         dragItem.current = null;
         dragOverItem.current = null;
+        
         const reorderedLinks = _links.map((link, index) => ({ ...link, order: index + 1 }));
         setLinks(reorderedLinks);
+
+        // 구글 시트에 순서 업데이트
+        try {
+            const linkOrders: { [key: string]: number } = {};
+            reorderedLinks.forEach((link, index) => {
+                linkOrders[link.id] = index + 1;
+            });
+            
+            await LinkService.updateLinkOrders(authUser.id, linkOrders);
+            console.log('링크 순서 구글 시트에 업데이트됨');
+        } catch (error) {
+            console.warn('링크 순서 업데이트 실패:', error);
+        }
     };
 
     const handleTemplateChange = (templateId: TemplateID) => {
@@ -82,39 +88,6 @@ const DashboardPage: React.FC = () => {
     const handleToggleActive = (linkId: string, isActive: boolean) => {
         setLinks(links.map(link => link.id === linkId ? {...link, isActive} : link));
     };
-
-    // 프로필 정보 업데이트 감지 - 임시로 주석 처리
-    /*
-    useEffect(() => {
-        const handleVisibilityChange = () => {
-            if (!document.hidden && authUser?.id) {
-                const refreshProfile = async () => {
-                    try {
-                        ProfileService.clearCache(authUser.id);
-                        const result = await ProfileService.getProfile(authUser.id);
-                        if (result.success && result.profile) {
-                            setUser(prevUser => ({
-                                ...prevUser,
-                                displayName: result.profile.displayName || prevUser.displayName,
-                                username: result.profile.username || prevUser.username,
-                                bio: result.profile.bio || prevUser.bio,
-                                avatar: result.profile.avatar || prevUser.avatar,
-                            }));
-                            console.log('프로필 정보 새로고침됨:', result.profile);
-                        }
-                    } catch (error) {
-                        console.warn('프로필 새로고침 실패:', error);
-                    }
-                };
-                refreshProfile();
-            }
-        };
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [authUser]);
-    */
     
     return (
         <div className="bg-gray-100 min-h-screen flex flex-col">
@@ -132,34 +105,40 @@ const DashboardPage: React.FC = () => {
                             </button>
 
                             <div>
-                                {links.map((link, index) => (
-                                    <div
-                                        key={link.id}
-                                        className="flex items-center bg-white p-4 rounded-lg shadow mb-3"
-                                        draggable
-                                        onDragStart={() => dragItem.current = index}
-                                        onDragEnter={() => dragOverItem.current = index}
-                                        onDragEnd={handleSort}
-                                        onDragOver={(e) => e.preventDefault()}
-                                    >
-                                        <div className="cursor-grab text-gray-400">
-                                            <DragHandleIcon className="h-6 w-6" />
-                                        </div>
-                                        <div className="flex-grow mx-4">
-                                            <p className="font-semibold text-gray-800">{link.title}</p>
-                                            <p className="text-sm text-gray-500">{link.url}</p>
-                                        </div>
-                                        <div className="flex items-center space-x-4">
-                                            <button onClick={() => navigate(`/link/edit/${link.id}`)} className="text-gray-500 hover:text-[#4F46E5]">
-                                                <EditIcon className="h-5 w-5" />
-                                            </button>
-                                            <div className="flex items-center">
-                                                <span id={`toggle-label-${link.id}`} className="sr-only">Toggle link visibility for {link.title}</span>
-                                                <Toggle labelId={`toggle-label-${link.id}`} checked={link.isActive} onChange={(checked) => handleToggleActive(link.id, checked)} />
+                                {linksLoading ? (
+                                    <div className="flex justify-center items-center py-8">
+                                        <div className="text-gray-500">링크를 불러오는 중...</div>
+                                    </div>
+                                ) : (
+                                    links.map((link, index) => (
+                                        <div
+                                            key={link.id}
+                                            className="flex items-center bg-white p-4 rounded-lg shadow mb-3"
+                                            draggable
+                                            onDragStart={() => dragItem.current = index}
+                                            onDragEnter={() => dragOverItem.current = index}
+                                            onDragEnd={handleSort}
+                                            onDragOver={(e) => e.preventDefault()}
+                                        >
+                                            <div className="cursor-grab text-gray-400">
+                                                <DragHandleIcon className="h-6 w-6" />
+                                            </div>
+                                            <div className="flex-grow mx-4">
+                                                <p className="font-semibold text-gray-800">{link.title}</p>
+                                                <p className="text-sm text-gray-500">{link.url}</p>
+                                            </div>
+                                            <div className="flex items-center space-x-4">
+                                                <button onClick={() => navigate(`/link/edit/${link.id}`)} className="text-gray-500 hover:text-[#4F46E5]">
+                                                    <EditIcon className="h-5 w-5" />
+                                                </button>
+                                                <div className="flex items-center">
+                                                    <span id={`toggle-label-${link.id}`} className="sr-only">Toggle link visibility for {link.title}</span>
+                                                    <Toggle labelId={`toggle-label-${link.id}`} checked={link.isActive} onChange={(checked) => handleToggleActive(link.id, checked)} />
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))
+                                )}
                             </div>
 
                             <div className="bg-white p-6 rounded-lg shadow">

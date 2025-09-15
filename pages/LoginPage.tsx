@@ -46,6 +46,15 @@ const LoginPage: React.FC = () => {
     }
 
     try {
+      // 로그인 시도 전에 로그인 유지 설정 미리 저장
+      if (rememberMe) {
+        localStorage.setItem('rememberMe', 'true');
+        console.log('무제한 로그인 유지 설정됨');
+      } else {
+        localStorage.removeItem('rememberMe');
+        console.log('일반 로그인 (7일 세션)');
+      }
+
       // 비밀번호 해시화
       const passwordHash = await hashPassword(password);
 
@@ -59,10 +68,11 @@ const LoginPage: React.FC = () => {
       const loginData = {
         email,
         passwordHash,
+        rememberMe, // 로그인 유지 정보도 서버에 전송
         action: 'login'
       };
 
-      console.log('로그인 요청:', loginData);
+      console.log('로그인 요청:', { ...loginData, passwordHash: '[HIDDEN]' });
 
       const response = await fetch(scriptUrl, {
         method: 'POST',
@@ -94,11 +104,15 @@ const LoginPage: React.FC = () => {
       }
 
       if (result.success) {
-        // 로그인 성공
+        // 로그인 성공 - 아이디 저장 처리
         if (saveId) {
           localStorage.setItem('savedEmail', email);
+          localStorage.setItem('saveIdEnabled', 'true');
+          console.log('이메일 저장됨:', email);
         } else {
           localStorage.removeItem('savedEmail');
+          localStorage.removeItem('saveIdEnabled');
+          console.log('저장된 이메일 제거됨');
         }
 
         // 실제 사용자 정보로 로그인 처리
@@ -109,23 +123,76 @@ const LoginPage: React.FC = () => {
           throw new Error('사용자 정보를 받지 못했습니다.');
         }
       } else {
+        // 로그인 실패 시 rememberMe 설정 제거
+        localStorage.removeItem('rememberMe');
         setError(result.message || '로그인에 실패했습니다.');
       }
 
     } catch (err: any) {
       console.error('로그인 오류:', err);
+      // 오류 발생 시 rememberMe 설정 제거
+      localStorage.removeItem('rememberMe');
       setError(err.message || '로그인 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
   };
 
-  // 컴포넌트 마운트 시 저장된 이메일 불러오기
+  // 이메일 입력 시 아이디 저장 체크박스 상태 업데이트
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEmail = e.target.value;
+    setEmail(newEmail);
+    
+    // 현재 입력된 이메일이 저장된 이메일과 같은지 확인
+    const savedEmail = localStorage.getItem('savedEmail');
+    const saveIdEnabled = localStorage.getItem('saveIdEnabled') === 'true';
+    
+    if (newEmail === savedEmail && saveIdEnabled) {
+      setSaveId(true);
+    } else if (newEmail !== savedEmail) {
+      // 다른 이메일을 입력하면 체크박스 해제
+      setSaveId(false);
+    }
+  };
+
+  // 아이디 저장 체크박스 변경 시
+  const handleSaveIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setSaveId(checked);
+    
+    if (!checked && email) {
+      // 체크 해제 시 현재 이메일이 저장된 이메일과 같다면 저장된 정보 삭제
+      const savedEmail = localStorage.getItem('savedEmail');
+      if (email === savedEmail) {
+        localStorage.removeItem('savedEmail');
+        localStorage.removeItem('saveIdEnabled');
+        console.log('저장된 이메일 삭제됨');
+      }
+    }
+  };
+
+  // 로그인 유지 체크박스 변경 시
+  const handleRememberMeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setRememberMe(checked);
+    console.log('로그인 유지 체크박스:', checked ? '체크됨 (무제한 유지)' : '해제됨 (7일 세션)');
+  };
+
+  // 컴포넌트 마운트 시 저장된 정보 불러오기
   useEffect(() => {
     const savedEmail = localStorage.getItem('savedEmail');
-    if (savedEmail) {
+    const saveIdEnabled = localStorage.getItem('saveIdEnabled') === 'true';
+    const rememberMeEnabled = localStorage.getItem('rememberMe') === 'true';
+    
+    if (savedEmail && saveIdEnabled) {
       setEmail(savedEmail);
       setSaveId(true);
+      console.log('저장된 이메일 불러옴:', savedEmail);
+    }
+    
+    if (rememberMeEnabled) {
+      setRememberMe(true);
+      console.log('로그인 유지 설정 불러옴: 무제한 유지');
     }
   }, []);
 
@@ -134,6 +201,15 @@ const LoginPage: React.FC = () => {
       navigate('/dashboard');
     }
   }, [isAuthenticated, navigate]);
+
+  // 저장된 이메일 삭제 버튼
+  const handleClearSavedEmail = () => {
+    localStorage.removeItem('savedEmail');
+    localStorage.removeItem('saveIdEnabled');
+    setEmail('');
+    setSaveId(false);
+    console.log('저장된 이메일 수동 삭제됨');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -165,7 +241,7 @@ const LoginPage: React.FC = () => {
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 이메일 주소
               </label>
-              <div className="mt-1">
+              <div className="mt-1 relative">
                 <input
                   id="email"
                   name="email"
@@ -173,11 +249,24 @@ const LoginPage: React.FC = () => {
                   autoComplete="email"
                   required
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#4F46E5] focus:border-[#4F46E5] sm:text-sm"
+                  onChange={handleEmailChange}
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#4F46E5] focus:border-[#4F46E5] sm:text-sm pr-10"
                   placeholder="you@example.com"
                   disabled={loading}
                 />
+                {/* 저장된 이메일이 있을 때 삭제 버튼 표시 */}
+                {email && saveId && (
+                  <button
+                    type="button"
+                    onClick={handleClearSavedEmail}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                    title="저장된 이메일 삭제"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -201,14 +290,14 @@ const LoginPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="space-y-4">
               <div className="flex items-center">
                 <input
                   id="saveId"
                   name="saveId"
                   type="checkbox"
                   checked={saveId}
-                  onChange={e => setSaveId(e.target.checked)}
+                  onChange={handleSaveIdChange}
                   className="h-4 w-4 text-[#4F46E5] focus:ring-[#4F46E5] border-gray-300 rounded"
                   disabled={loading}
                 />
@@ -217,19 +306,21 @@ const LoginPage: React.FC = () => {
                 </label>
               </div>
 
-              <div className="flex items-center">
+              <div className="flex items-start">
                 <input
                   id="rememberMe"
                   name="rememberMe"
                   type="checkbox"
                   checked={rememberMe}
-                  onChange={e => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 text-[#4F46E5] focus:ring-[#4F46E5] border-gray-300 rounded"
+                  onChange={handleRememberMeChange}
+                  className="h-4 w-4 text-[#4F46E5] focus:ring-[#4F46E5] border-gray-300 rounded mt-0.5"
                   disabled={loading}
                 />
-                <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-900">
-                  로그인 유지하기
-                </label>
+                <div className="ml-2">
+                  <label htmlFor="rememberMe" className="block text-sm text-gray-900">
+                    로그인 유지하기
+                  </label>
+                </div>
               </div>
             </div>
 

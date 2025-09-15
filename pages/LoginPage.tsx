@@ -142,7 +142,7 @@ const LoginPage: React.FC = () => {
           <LogoIcon className="w-12 h-12 text-[#4F46E5]" />
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          LinkHub에 로그인
+          Link:it.da에 로그인
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
           계정이 없으신가요?{' '}
@@ -252,7 +252,7 @@ const LoginPage: React.FC = () => {
 
           <div className="mt-6">
             <div className="text-center">
-              <span className="text-xs text-gray-500">Powered by LinkHub</span>
+              <span className="text-xs text-gray-500">Powered by Link:it.da</span>
             </div>
           </div>
         </div>

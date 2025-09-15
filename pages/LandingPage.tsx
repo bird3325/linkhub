@@ -12,7 +12,7 @@ const LandingPage: React.FC = () => {
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center space-x-2">
             <LogoIcon className="h-8 w-8 text-[#4F46E5]" />
-            <span className="font-bold text-2xl text-gray-800">LinkHub</span>
+            <span className="font-bold text-2xl text-gray-800">Link:it.da</span>
           </div>
           <button onClick={() => navigate('/login')} className="bg-white text-gray-700 font-semibold py-2 px-4 rounded-lg flex items-center space-x-2 hover:bg-gray-100 transition border border-gray-300">
             <span>로그인</span>
@@ -26,7 +26,7 @@ const LandingPage: React.FC = () => {
           <span className="text-[#4F46E5]">간단하게</span> 관리하세요
         </h1>
         <p className="mt-6 text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
-          LinkHub는 여러 SNS와 웹사이트 링크를 하나의 페이지에서 보여주는 가장 쉬운 방법입니다. 지금 바로 시작해보세요!
+          Link:it.da는 여러 SNS와 웹사이트 링크를 하나의 페이지에서 보여주는 가장 쉬운 방법입니다. 지금 바로 시작해보세요!
         </p>
         <button onClick={() => navigate('/login')} className="mt-8 bg-[#4F46E5] text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-[#4338CA] transition transform hover:scale-105">
           3분만에 시작하기
@@ -51,7 +51,7 @@ const LandingPage: React.FC = () => {
       </main>
 
       <footer className="py-8 text-center text-gray-500">
-        Powered by LinkHub
+        Powered by Link:it.da
       </footer>
     </div>
   );

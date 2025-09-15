@@ -299,13 +299,13 @@ const ProfileEditPage: React.FC = () => {
                     </div>
                     <div className="bg-white p-6 rounded-lg shadow space-y-6">
                         <div>
-                            <label htmlFor="displayName" className="text-base font-bold text-gray-800">표시될 이름</label>
+                            <label htmlFor="displayName" className="text-base font-bold text-gray-800">닉네임</label>
                             <input 
                                 id="displayName" 
                                 type="text" 
                                 value={displayName} 
                                 onChange={e => setDisplayName(e.target.value)} 
-                                placeholder={user.name || "표시될 이름을 입력하세요"} 
+                                placeholder={user.name || "닉네임을 입력하세요"} 
                                 className="mt-2 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#4F46E5] focus:border-[#4F46E5] sm:text-sm"
                                 disabled={loading}
                             />
@@ -314,7 +314,7 @@ const ProfileEditPage: React.FC = () => {
                             <label htmlFor="username" className="text-base font-bold text-gray-800">사용자 이름 (URL)</label>
                             <div className="mt-2 flex rounded-md shadow-sm">
                                 <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
-                                    linkhub.dev/
+                                    linkitda.dev/
                                 </span>
                                 <input 
                                     id="username" 

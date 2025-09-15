@@ -91,7 +91,7 @@ const Header: React.FC = () => {
           <div className="flex items-center space-x-8">
             <div className="flex-shrink-0 flex items-center space-x-2">
                 <LogoIcon className="h-8 w-8 text-[#4F46E5]" />
-                <span className="font-bold text-xl text-gray-800">LinkHub</span>
+                <span className="font-bold text-xl text-gray-800">Link:it.da</span>
             </div>
             <nav className="hidden md:flex md:space-x-8">
               <NavLink

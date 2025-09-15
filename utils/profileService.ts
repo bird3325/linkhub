@@ -21,10 +21,10 @@ export class ProfileService {
     });
   }
 
-  // 프로필 저장 (수정됨 - userEmail 필수로 전달)
+  // 프로필 저장 (수정됨)
   static async saveProfile(profileData: {
-    userId?: string;
-    userEmail: string; // 필수로 변경
+    userId?: string | number;
+    userEmail: string;
     displayName: string;
     username: string;
     bio: string;
@@ -40,9 +40,12 @@ export class ProfileService {
     }
 
     try {
+      // 안전한 문자열 변환
+      const userIdStr = profileData.userId ? String(profileData.userId).trim() : '';
+
       const requestData = {
         action: 'save_profile',
-        userId: profileData.userId || null,
+        userId: userIdStr || null,
         userEmail: profileData.userEmail, // 필수 전달
         displayName: profileData.displayName || '',
         username: profileData.username || '',
@@ -76,7 +79,7 @@ export class ProfileService {
       
       // 성공시 캐시 업데이트 (실제 사용자 ID로)
       if (result.success && result.actualUserId) {
-        this.setCachedProfile(result.actualUserId, {
+        this.setCachedProfile(String(result.actualUserId), {
           userId: result.actualUserId,
           displayName: profileData.displayName,
           username: profileData.username,
@@ -94,14 +97,17 @@ export class ProfileService {
   }
 
   // 프로필 조회 (수정됨)
-  static async getProfile(userId?: string, username?: string, userEmail?: string) {
+  static async getProfile(userId?: string | number, username?: string, userEmail?: string) {
     if (!this.scriptUrl) {
       throw new Error('앱스 스크립트 URL이 설정되지 않았습니다.');
     }
 
+    // 안전한 문자열 변환
+    const userIdStr = userId ? String(userId).trim() : '';
+
     // 캐시 확인 (userId로 조회하는 경우만)
-    if (userId) {
-      const cached = this.getCachedProfile(userId);
+    if (userIdStr) {
+      const cached = this.getCachedProfile(userIdStr);
       if (cached) {
         console.log('캐시된 프로필 사용:', cached);
         return { success: true, profile: cached };
@@ -111,7 +117,7 @@ export class ProfileService {
     try {
       const requestData = {
         action: 'get_profile',
-        userId: userId || null,
+        userId: userIdStr || null,
         username: username || null,
         userEmail: userEmail || null
       };
@@ -142,7 +148,7 @@ export class ProfileService {
       
       // 성공시 캐시 저장 (실제 사용자 ID로)
       if (result.success && result.profile && result.profile.userId) {
-        this.setCachedProfile(result.profile.userId, result.profile);
+        this.setCachedProfile(String(result.profile.userId), result.profile);
       }
 
       return result;
@@ -154,9 +160,10 @@ export class ProfileService {
   }
 
   // 캐시 클리어
-  static clearCache(userId?: string) {
+  static clearCache(userId?: string | number) {
     if (userId) {
-      this.profileCache.delete(userId);
+      const userIdStr = String(userId);
+      this.profileCache.delete(userIdStr);
     } else {
       this.profileCache.clear();
     }

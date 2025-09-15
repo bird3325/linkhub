@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useContext } from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 
 import LandingPage from './pages/LandingPage';
@@ -16,7 +16,6 @@ import { AuthProvider, AuthContext } from './contexts/AuthContext';
 import { LinkContext } from './contexts/LinkContext';
 
 import type { Link } from './types';
-import { MOCK_LINKS } from './constants';
 
 const ProtectedRoute: React.FC<{ isAuthenticated: boolean }> = ({ isAuthenticated }) => {
   if (!isAuthenticated) {
@@ -27,12 +26,13 @@ const ProtectedRoute: React.FC<{ isAuthenticated: boolean }> = ({ isAuthenticate
 
 // AuthContext를 사용하는 래퍼 컴포넌트
 const ProtectedRouteWrapper: React.FC = () => {
-  const { isAuthenticated } = React.useContext(AuthContext);
+  const { isAuthenticated } = useContext(AuthContext);
   return <ProtectedRoute isAuthenticated={isAuthenticated} />;
 };
 
 function App() {
-  const [links, setLinks] = useState<Link[]>(MOCK_LINKS.sort((a, b) => a.order - b.order));
+  // MOCK_LINKS 제거, 빈 배열로 초기화
+  const [links, setLinks] = useState<Link[]>([]);
 
   const linkContextValue = useMemo(() => ({
     links,

@@ -42,14 +42,107 @@ const LinkEditorPage: React.FC = () => {
         }
     }, [linkId, links, isNew, navigate]);
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
+    // 이미지 압축 함수 (프로필용과 동일)
+    const compressImage = (file: File, maxWidth = 600, maxHeight = 600, quality = 0.8): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+
+            img.onload = () => {
+                // 원본 이미지 크기
+                let { width, height } = img;
+
+                // 최대 크기에 맞춰 비율 계산
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                
+                if (ratio < 1) {
+                    width = width * ratio;
+                    height = height * ratio;
+                }
+
+                // 캔버스 크기 설정
+                canvas.width = width;
+                canvas.height = height;
+
+                // 이미지 그리기
+                ctx?.drawImage(img, 0, 0, width, height);
+
+                // base64로 변환 (JPEG, 품질 조정)
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                
+                console.log('링크 이미지 압축 완료:', {
+                    originalSize: file.size,
+                    compressedSize: compressedDataUrl.length,
+                    dimensions: `${width}x${height}`,
+                    compressionRatio: ((file.size - compressedDataUrl.length) / file.size * 100).toFixed(1) + '%'
+                });
+
+                resolve(compressedDataUrl);
+            };
+
+            img.onerror = () => {
+                reject(new Error('이미지 로드 실패'));
+            };
+
+            // 파일을 이미지로 로드
             const reader = new FileReader();
-            reader.onloadend = () => {
-                setImageUrl(reader.result as string);
+            reader.onload = (e) => {
+                img.src = e.target?.result as string;
+            };
+            reader.onerror = () => {
+                reject(new Error('파일 읽기 실패'));
             };
             reader.readAsDataURL(file);
+        });
+    };
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // 파일 크기 체크 (10MB 이상은 거부)
+        const maxFileSize = 10 * 1024 * 1024; // 10MB
+        if (file.size > maxFileSize) {
+            setError('이미지 파일 크기는 10MB 이하여야 합니다.');
+            return;
+        }
+
+        // 지원되는 이미지 형식 체크
+        const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        if (!supportedTypes.includes(file.type)) {
+            setError('지원되는 이미지 형식: JPG, PNG, GIF, WebP');
+            return;
+        }
+
+        try {
+            setError('');
+            setLoading(true);
+            
+            // 이미지 압축 (링크 이미지는 더 작게)
+            const compressedImage = await compressImage(file, 600, 600, 0.8);
+            
+            // base64 크기 체크 (1.5MB 이하로 제한)
+            const sizeInMB = (compressedImage.length * 3) / 4 / (1024 * 1024);
+            if (sizeInMB > 1.5) {
+                // 더 강한 압축 시도
+                const moreCompressed = await compressImage(file, 400, 400, 0.6);
+                const newSizeInMB = (moreCompressed.length * 3) / 4 / (1024 * 1024);
+                
+                if (newSizeInMB > 1.5) {
+                    setError('이미지가 너무 큽니다. 더 작은 이미지를 선택해주세요.');
+                    return;
+                }
+                setImageUrl(moreCompressed);
+            } else {
+                setImageUrl(compressedImage);
+            }
+            
+        } catch (error: any) {
+            console.error('이미지 처리 오류:', error);
+            setError('이미지 처리 중 오류가 발생했습니다: ' + error.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -103,7 +196,10 @@ const LinkEditorPage: React.FC = () => {
                     isActive
                 };
 
-                console.log('새 링크 저장 시도:', linkData);
+                console.log('새 링크 저장 시도:', {
+                    ...linkData,
+                    imageUrl: linkData.imageUrl ? `[이미지 데이터 ${Math.round(linkData.imageUrl.length / 1024)}KB]` : '없음'
+                });
 
                 const result = await LinkService.saveLink(linkData);
 
@@ -142,6 +238,12 @@ const LinkEditorPage: React.FC = () => {
                     isActive
                 };
 
+                console.log('링크 업데이트 시도:', {
+                    linkId,
+                    ...updateData,
+                    imageUrl: updateData.imageUrl ? `[이미지 데이터 ${Math.round(updateData.imageUrl.length / 1024)}KB]` : '없음'
+                });
+
                 const result = await LinkService.updateLink(linkId!, updateData);
 
                 if (result.success) {
@@ -162,7 +264,11 @@ const LinkEditorPage: React.FC = () => {
             }
         } catch (error: any) {
             console.error('링크 저장 오류:', error);
-            setError(error.message || '링크 저장 중 오류가 발생했습니다.');
+            if (error.message.includes('Failed to fetch')) {
+                setError('네트워크 오류가 발생했습니다. 이미지 크기를 줄여서 다시 시도해주세요.');
+            } else {
+                setError(error.message || '링크 저장 중 오류가 발생했습니다.');
+            }
         } finally {
             setLoading(false);
         }
@@ -335,7 +441,7 @@ const LinkEditorPage: React.FC = () => {
                                     <label className="text-base font-bold text-gray-800">이미지 *</label>
                                     <div className="mt-2">
                                         <div 
-                                            className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-[#4F46E5] bg-gray-50 overflow-hidden"
+                                            className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-[#4F46E5] bg-gray-50 overflow-hidden relative"
                                             onClick={() => !loading && fileInputRef.current?.click()}
                                         >
                                             {imageUrl ? (
@@ -343,17 +449,25 @@ const LinkEditorPage: React.FC = () => {
                                             ) : (
                                                 <PlusIcon className="w-8 h-8 text-gray-400" />
                                             )}
+                                            {loading && (
+                                                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                                                    <div className="text-white text-xs">처리중...</div>
+                                                </div>
+                                            )}
                                         </div>
                                         <input 
                                             type="file" 
                                             ref={fileInputRef} 
                                             onChange={handleImageUpload} 
-                                            accept="image/*" 
+                                            accept="image/jpeg,image/jpg,image/png,image/gif,image/webp" 
                                             className="hidden"
                                             disabled={loading}
                                         />
                                         <p className="text-xs text-gray-500 mt-2">파일을 선택하여 업로드해주세요</p>
-                                        <p className="text-xs text-gray-400">1:1 비율 이미지를 권장합니다.</p>
+                                        <p className="text-xs text-gray-400">
+                                            지원 형식: JPG, PNG, GIF, WebP<br />
+                                            최대 크기: 10MB (자동 압축됩니다)
+                                        </p>
                                         {imageUrl && (
                                             <button 
                                                 onClick={() => setImageUrl(null)} 

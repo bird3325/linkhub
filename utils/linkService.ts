@@ -15,8 +15,8 @@ export class LinkService {
 
   // 새 링크 저장 (수정됨)
   static async saveLink(linkData: {
-    userId: string;
-    userEmail?: string; // 추가
+    userId: string | number;
+    userEmail?: string;
     title: string;
     url: string;
     description?: string;
@@ -32,8 +32,11 @@ export class LinkService {
       throw new Error(error);
     }
 
-    // 필수 데이터 검증
-    if (!linkData.userId && !linkData.userEmail) {
+    // 필수 데이터 검증 (수정됨)
+    const userIdStr = linkData.userId ? String(linkData.userId).trim() : '';
+    const userEmailStr = linkData.userEmail ? String(linkData.userEmail).trim() : '';
+    
+    if (!userIdStr && !userEmailStr) {
       throw new Error('사용자 ID 또는 이메일이 필요합니다.');
     }
     if (!linkData.title?.trim()) {
@@ -46,8 +49,8 @@ export class LinkService {
     try {
       const requestData = {
         action: 'save_link',
-        userId: linkData.userId,
-        userEmail: linkData.userEmail, // 추가
+        userId: userIdStr,
+        userEmail: userEmailStr,
         title: linkData.title.trim(),
         url: linkData.url.trim(),
         description: linkData.description?.trim() || '',
@@ -108,22 +111,26 @@ export class LinkService {
   }
 
   // 사용자의 모든 링크 조회 (수정됨)
-  static async getLinks(userId: string, userEmail?: string): Promise<Link[]> {
+  static async getLinks(userId: string | number, userEmail?: string): Promise<Link[]> {
     this.log('getLinks 호출됨', { userId, userEmail });
 
     if (!this.scriptUrl) {
       throw new Error('앱스 스크립트 URL이 설정되지 않았습니다.');
     }
 
-    if (!userId?.trim() && !userEmail?.trim()) {
+    // 안전한 문자열 변환 (수정됨)
+    const userIdStr = userId ? String(userId).trim() : '';
+    const userEmailStr = userEmail ? String(userEmail).trim() : '';
+
+    if (!userIdStr && !userEmailStr) {
       throw new Error('사용자 ID 또는 이메일이 필요합니다.');
     }
 
     try {
       const requestData = {
         action: 'get_links',
-        userId: userId?.trim(),
-        userEmail: userEmail?.trim()
+        userId: userIdStr,
+        userEmail: userEmailStr
       };
 
       this.log('링크 조회 요청 데이터', requestData);
@@ -156,7 +163,7 @@ export class LinkService {
         // 구글 시트 데이터를 React Link 타입으로 변환
         const convertedLinks: Link[] = (result.links || []).map((link: any) => ({
           id: link.id,
-          userId: link.userId,
+          userId: String(link.userId), // 문자열로 변환
           title: link.title,
           url: link.url,
           style: link.style,
@@ -233,7 +240,7 @@ export class LinkService {
   }
 
   // 링크 순서 업데이트 (수정됨)
-  static async updateLinkOrders(userId: string, linkOrders: { [key: string]: number }, userEmail?: string) {
+  static async updateLinkOrders(userId: string | number, linkOrders: { [key: string]: number }, userEmail?: string) {
     this.log('updateLinkOrders 호출됨', { userId, linkOrders, userEmail });
 
     if (!this.scriptUrl) {
@@ -241,10 +248,14 @@ export class LinkService {
     }
 
     try {
+      // 안전한 문자열 변환
+      const userIdStr = userId ? String(userId).trim() : '';
+      const userEmailStr = userEmail ? String(userEmail).trim() : '';
+
       const requestData = {
         action: 'update_link_orders',
-        userId: userId,
-        userEmail: userEmail,
+        userId: userIdStr,
+        userEmail: userEmailStr,
         linkOrders: linkOrders
       };
 

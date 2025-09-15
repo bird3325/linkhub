@@ -21,9 +21,10 @@ export class ProfileService {
     });
   }
 
-  // 프로필 저장
+  // 프로필 저장 (수정됨 - userEmail 필수로 전달)
   static async saveProfile(profileData: {
-    userId: string;
+    userId?: string;
+    userEmail: string; // 필수로 변경
     displayName: string;
     username: string;
     bio: string;
@@ -33,14 +34,20 @@ export class ProfileService {
       throw new Error('앱스 스크립트 URL이 설정되지 않았습니다.');
     }
 
+    // userEmail이 필수가 됨
+    if (!profileData.userEmail) {
+      throw new Error('사용자 이메일이 필요합니다.');
+    }
+
     try {
       const requestData = {
         action: 'save_profile',
-        userId: profileData.userId,
-        displayName: profileData.displayName,
-        username: profileData.username,
-        bio: profileData.bio,
-        avatar: profileData.avatar
+        userId: profileData.userId || null,
+        userEmail: profileData.userEmail, // 필수 전달
+        displayName: profileData.displayName || '',
+        username: profileData.username || '',
+        bio: profileData.bio || '',
+        avatar: profileData.avatar || ''
       };
 
       console.log('프로필 저장 요청:', requestData);
@@ -67,10 +74,10 @@ export class ProfileService {
 
       const result = JSON.parse(responseText);
       
-      // 성공시 캐시 업데이트
-      if (result.success) {
-        this.setCachedProfile(profileData.userId, {
-          userId: profileData.userId,
+      // 성공시 캐시 업데이트 (실제 사용자 ID로)
+      if (result.success && result.actualUserId) {
+        this.setCachedProfile(result.actualUserId, {
+          userId: result.actualUserId,
           displayName: profileData.displayName,
           username: profileData.username,
           bio: profileData.bio,
@@ -86,8 +93,8 @@ export class ProfileService {
     }
   }
 
-  // 프로필 조회
-  static async getProfile(userId?: string, username?: string) {
+  // 프로필 조회 (수정됨)
+  static async getProfile(userId?: string, username?: string, userEmail?: string) {
     if (!this.scriptUrl) {
       throw new Error('앱스 스크립트 URL이 설정되지 않았습니다.');
     }
@@ -104,8 +111,9 @@ export class ProfileService {
     try {
       const requestData = {
         action: 'get_profile',
-        userId: userId || '',
-        username: username || ''
+        userId: userId || null,
+        username: username || null,
+        userEmail: userEmail || null
       };
 
       console.log('프로필 조회 요청:', requestData);
@@ -132,9 +140,9 @@ export class ProfileService {
 
       const result = JSON.parse(responseText);
       
-      // 성공시 캐시 저장 (userId가 있는 경우만)
-      if (result.success && result.profile && userId) {
-        this.setCachedProfile(userId, result.profile);
+      // 성공시 캐시 저장 (실제 사용자 ID로)
+      if (result.success && result.profile && result.profile.userId) {
+        this.setCachedProfile(result.profile.userId, result.profile);
       }
 
       return result;

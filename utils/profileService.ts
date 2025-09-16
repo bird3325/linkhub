@@ -110,7 +110,7 @@ export class ProfileService {
     }
   }
 
-  // 프로필 업데이트 (새로 추가)
+  // 프로필 업데이트 (수정됨 - 에러 처리 강화)
   static async updateProfile(userId: string | number, updateData: {
     displayName?: string;
     username?: string;
@@ -121,11 +121,15 @@ export class ProfileService {
     this.log('프로필 업데이트 요청', { userId, updateData, userEmail });
 
     if (!this.scriptUrl) {
-      throw new Error('앱스 스크립트 URL이 설정되지 않았습니다.');
+      const error = new Error('Google Apps Script URL이 설정되지 않았습니다. VITE_GOOGLE_APPS_SCRIPT_URL 환경변수를 확인해주세요.');
+      this.error('스크립트 URL 누락', error);
+      throw error;
     }
 
     if (!userId && !userEmail) {
-      throw new Error('사용자 ID 또는 이메일이 필요합니다.');
+      const error = new Error('사용자 ID 또는 이메일이 필요합니다.');
+      this.error('사용자 식별 정보 누락', error);
+      throw error;
     }
 
     try {
@@ -141,6 +145,11 @@ export class ProfileService {
       };
 
       this.log('프로필 업데이트 요청 데이터', requestData);
+      this.log('사용할 Apps Script URL', this.scriptUrl);
+
+      // 타임아웃 설정 (30초)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
       const response = await fetch(this.scriptUrl, {
         method: 'POST',
@@ -148,11 +157,16 @@ export class ProfileService {
           'Content-Type': 'text/plain;charset=utf-8',
         },
         body: JSON.stringify(requestData),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
+
+      this.log('HTTP 응답 상태', { status: response.status, ok: response.ok });
 
       if (!response.ok) {
         const errorText = await response.text();
-        this.error('프로필 업데이트 HTTP 오류', { 
+        this.error('HTTP 오류 응답', { 
           status: response.status, 
           text: errorText 
         });
@@ -160,23 +174,29 @@ export class ProfileService {
       }
 
       const responseText = await response.text();
-      this.log('프로필 업데이트 응답', responseText);
+      this.log('원시 응답 텍스트', responseText);
 
-      if (!responseText) {
+      if (!responseText || responseText.trim() === '') {
+        this.error('빈 응답 받음', responseText);
         throw new Error('서버에서 빈 응답을 받았습니다.');
       }
 
       let result;
       try {
         result = JSON.parse(responseText);
-        this.log('프로필 업데이트 파싱된 응답', result);
+        this.log('파싱된 응답', result);
       } catch (parseError) {
-        this.error('프로필 업데이트 JSON 파싱 오류', { responseText, parseError });
+        this.error('JSON 파싱 오류', { responseText, parseError });
         throw new Error('서버 응답을 파싱할 수 없습니다: ' + responseText.substring(0, 200));
       }
 
+      if (!result) {
+        this.error('파싱 결과가 null/undefined', result);
+        throw new Error('유효하지 않은 서버 응답입니다.');
+      }
+
       if (!result.success) {
-        this.error('프로필 업데이트 실패 응답', result);
+        this.error('서버에서 실패 응답', result);
         throw new Error(result.message || '프로필 업데이트에 실패했습니다.');
       }
 
@@ -189,20 +209,26 @@ export class ProfileService {
         }
       }
 
+      this.log('프로필 업데이트 성공', result);
       return result;
 
     } catch (error: any) {
       this.error('프로필 업데이트 오류', error);
       
-      // 에러 타입별 처리
-      if (error.message.includes('Failed to fetch')) {
-        throw new Error('네트워크 연결 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
-      }
-      
-      if (error.message.includes('timeout')) {
+      // 에러 타입별 구체적 처리
+      if (error.name === 'AbortError') {
         throw new Error('요청 시간이 초과되었습니다. 다시 시도해주세요.');
       }
       
+      if (error.message.includes('Failed to fetch') || error.message.includes('fetch')) {
+        throw new Error('네트워크 연결 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
+      }
+      
+      if (error.message.includes('timeout') || error.message.includes('시간')) {
+        throw new Error('요청 시간이 초과되었습니다. 다시 시도해주세요.');
+      }
+      
+      // 이미 처리된 에러는 그대로 전달
       throw error;
     }
   }

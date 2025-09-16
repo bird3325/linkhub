@@ -17,6 +17,9 @@ const DashboardPage: React.FC = () => {
   const [linksLoading, setLinksLoading] = useState(true);
   const [displayUser, setDisplayUser] = useState<User | null>(null);
   const [toggleLoading, setToggleLoading] = useState<{ [key: string]: boolean }>({});
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateID | null>(null);
+  const [templateSaving, setTemplateSaving] = useState(false);
+  const [templateSaveMessage, setTemplateSaveMessage] = useState('');
   const { links, setLinks } = useContext(LinkContext);
   const { user: authUser, setUser } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -66,6 +69,21 @@ const DashboardPage: React.FC = () => {
     navigate('/link/new');
   };
 
+  // 내 페이지 보기 핸들러
+  const handleViewMyPage = () => {
+    if (!displayUser?.username) {
+      alert('사용자명이 설정되지 않았습니다. 프로필을 먼저 설정해주세요.');
+      navigate('/profile/edit');
+      return;
+    }
+    
+    const currentDomain = window.location.origin;
+    const profileUrl = `${currentDomain}/#/profile/${displayUser.username}`;
+    
+    console.log('내 페이지 링크:', profileUrl);
+    window.open(profileUrl, '_blank', 'noopener,noreferrer');
+  };
+
   // 프로필 정보 로드
   useEffect(() => {
     const loadProfile = async () => {
@@ -90,18 +108,25 @@ const DashboardPage: React.FC = () => {
             displayName: result.profile.displayName || authUser.displayName || authUser.name,
             username: result.profile.username || authUser.username || authUser.email?.split('@')[0],
             bio: result.profile.bio || authUser.bio,
-            avatar: result.profile.avatar || authUser.avatar
+            avatar: result.profile.avatar || authUser.avatar,
+            template: result.profile.template || authUser.template || TemplateID.Glass
           };
           
           setUser(updatedAuthUser);
-          setDisplayUser(createDisplayUser(authUser, result.profile));
+          const createdUser = createDisplayUser(authUser, result.profile);
+          setDisplayUser(createdUser);
+          setSelectedTemplate(createdUser.template);
         } else {
           console.log('구글 시트에 프로필이 없음, 기본값 사용');
-          setDisplayUser(createDisplayUser(authUser));
+          const createdUser = createDisplayUser(authUser);
+          setDisplayUser(createdUser);
+          setSelectedTemplate(createdUser.template);
         }
       } catch (error) {
         console.warn('프로필 로드 실패:', error);
-        setDisplayUser(createDisplayUser(authUser));
+        const createdUser = createDisplayUser(authUser);
+        setDisplayUser(createdUser);
+        setSelectedTemplate(createdUser.template);
       } finally {
         setProfileLoading(false);
       }
@@ -176,31 +201,72 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  const handleTemplateChange = async (templateId: TemplateID) => {
-    if (!authUser || !setUser || !displayUser) return;
-
-    console.log('템플릿 변경:', templateId);
+  // 템플릿 선택 핸들러 (저장하지 않고 미리보기만)
+  const handleTemplateSelect = (templateId: TemplateID) => {
+    console.log('템플릿 선택:', templateId);
+    setSelectedTemplate(templateId);
     
-    const updatedAuthUser = {
-      ...authUser,
-      template: templateId
-    };
-    
-    setUser(updatedAuthUser);
-    
-    setDisplayUser({
-      ...displayUser,
-      template: templateId
-    });
-    
-    try {
-      console.log('템플릿 변경 완료:', templateId);
-    } catch (error) {
-      console.warn('템플릿 변경 저장 실패:', error);
+    // 미리보기용으로만 displayUser 업데이트
+    if (displayUser) {
+      setDisplayUser({
+        ...displayUser,
+        template: templateId
+      });
     }
   };
 
-  // 링크 활성/비활성 토글 (더욱 안전한 처리)
+  // 템플릿 저장 핸들러 (구글시트에 저장)
+  const handleSaveTemplate = async () => {
+    if (!authUser?.id || !selectedTemplate) {
+      alert('템플릿을 선택해주세요.');
+      return;
+    }
+
+    setTemplateSaving(true);
+    setTemplateSaveMessage('');
+
+    try {
+      console.log('템플릿 저장 시작:', selectedTemplate);
+
+      // ProfileService를 통해 템플릿 저장
+      const result = await ProfileService.updateProfile(authUser.id, {
+        template: selectedTemplate
+      }, authUser.email);
+
+      if (result.success) {
+        console.log('템플릿 저장 성공:', selectedTemplate);
+        
+        // AuthContext의 사용자 정보 업데이트
+        const updatedAuthUser = {
+          ...authUser,
+          template: selectedTemplate
+        };
+        setUser(updatedAuthUser);
+        
+        setTemplateSaveMessage('템플릿이 성공적으로 저장되었습니다!');
+        
+        // 성공 메시지 3초 후 제거
+        setTimeout(() => {
+          setTemplateSaveMessage('');
+        }, 3000);
+        
+      } else {
+        throw new Error(result.message || '템플릿 저장에 실패했습니다.');
+      }
+    } catch (error: any) {
+      console.error('템플릿 저장 실패:', error);
+      setTemplateSaveMessage(`템플릿 저장 실패: ${error.message}`);
+      
+      // 에러 메시지 5초 후 제거
+      setTimeout(() => {
+        setTemplateSaveMessage('');
+      }, 5000);
+    } finally {
+      setTemplateSaving(false);
+    }
+  };
+
+  // 링크 활성/비활성 토글
   const handleToggleActive = async (linkId: string, isActive: boolean) => {
     console.log('링크 활성 상태 변경 시작:', { linkId, isActive });
 
@@ -210,7 +276,6 @@ const DashboardPage: React.FC = () => {
       return;
     }
 
-    // 링크 존재 확인
     const targetLink = links.find(l => l.id === linkId);
     if (!targetLink) {
       console.error('해당 링크를 찾을 수 없습니다:', linkId);
@@ -218,16 +283,13 @@ const DashboardPage: React.FC = () => {
       return;
     }
 
-    // 이미 같은 상태인 경우 처리하지 않음
     if (targetLink.isActive === isActive) {
       console.log('이미 같은 상태입니다:', isActive);
       return;
     }
 
-    // 토글 로딩 상태 설정
     setToggleLoading(prev => ({ ...prev, [linkId]: true }));
 
-    // 즉시 UI 업데이트 (낙관적 업데이트)
     const originalLinks = [...links];
     setLinks(links.map(link => 
       link.id === linkId ? { ...link, isActive } : link
@@ -236,7 +298,6 @@ const DashboardPage: React.FC = () => {
     try {
       console.log('서버에 토글 요청 전송 중...');
       
-      // 최소한의 데이터만 전송
       const result = await LinkService.updateLink(linkId, { 
         isActive: isActive 
       });
@@ -248,21 +309,15 @@ const DashboardPage: React.FC = () => {
           title: targetLink.title
         });
         
-        // 성공 알림 (선택사항)
         console.log(`${targetLink.title}이(가) ${isActive ? '공개' : '비공개'}되었습니다.`);
         
       } else {
         console.warn('서버에서 실패 응답:', result.message);
-        
-        // 실패 시 원래 상태로 되돌리기
         setLinks(originalLinks);
-        
         alert(`링크 ${isActive ? '공개' : '비공개'} 설정에 실패했습니다.\n${result.message || '알 수 없는 오류'}`);
       }
     } catch (error: any) {
       console.error('링크 활성 상태 변경 오류:', error);
-      
-      // 실패 시 원래 상태로 되돌리기
       setLinks(originalLinks);
       
       let errorMessage = '링크 상태 변경 중 오류가 발생했습니다.';
@@ -278,14 +333,13 @@ const DashboardPage: React.FC = () => {
       alert(errorMessage);
       
     } finally {
-      // 토글 로딩 상태 해제
       setTimeout(() => {
         setToggleLoading(prev => {
           const newState = { ...prev };
           delete newState[linkId];
           return newState;
         });
-      }, 500); // 0.5초 후 로딩 상태 해제
+      }, 500);
     }
   };
 
@@ -358,7 +412,6 @@ const DashboardPage: React.FC = () => {
                         className={`w-5 h-5 text-gray-400 ${toggleLoading[link.id] ? 'cursor-not-allowed' : 'cursor-move'}`} 
                       />
                       <div className="flex items-center space-x-3">
-                        {/* 링크 스타일에 따른 썸네일 표시 */}
                         {link.imageUrl && (link.style === 'THUMBNAIL' || link.style === 'BACKGROUND') && (
                           <img 
                             src={link.imageUrl} 
@@ -408,7 +461,6 @@ const DashboardPage: React.FC = () => {
                             labelId={`toggle-link-visibility-${link.id}`}
                             disabled={toggleLoading[link.id]}
                           />
-                          {/* 로딩 표시 */}
                           {toggleLoading[link.id] && (
                             <div className="absolute inset-0 flex items-center justify-center">
                               <div className="w-3 h-3 border border-[#4F46E5] border-t-transparent rounded-full animate-spin"></div>
@@ -431,7 +483,39 @@ const DashboardPage: React.FC = () => {
 
           {/* Template Selection */}
           <div className="bg-white rounded-lg shadow p-6 mb-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">템플릿 선택</h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900">템플릿 선택</h2>
+              <button
+                onClick={handleSaveTemplate}
+                disabled={templateSaving || !selectedTemplate}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  templateSaving || !selectedTemplate
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-[#4F46E5] text-white hover:bg-[#4338CA]'
+                }`}
+              >
+                {templateSaving ? (
+                  <>
+                    <div className="w-4 h-4 border border-white border-t-transparent rounded-full animate-spin inline-block mr-2"></div>
+                    저장 중...
+                  </>
+                ) : (
+                  '템플릿 저장'
+                )}
+              </button>
+            </div>
+
+            {/* 저장 메시지 표시 */}
+            {templateSaveMessage && (
+              <div className={`mb-4 p-3 rounded-md ${
+                templateSaveMessage.includes('성공') 
+                  ? 'bg-green-50 border border-green-200 text-green-800' 
+                  : 'bg-red-50 border border-red-200 text-red-800'
+              }`}>
+                <p className="text-sm">{templateSaveMessage}</p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {TEMPLATES.map(template => (
                 <label key={template.id} className="cursor-pointer">
@@ -439,13 +523,34 @@ const DashboardPage: React.FC = () => {
                     type="radio"
                     name="template"
                     value={template.id}
-                    checked={displayUser.template === template.id}
-                    onChange={() => handleTemplateChange(template.id as TemplateID)}
+                    checked={selectedTemplate === template.id}
+                    onChange={() => handleTemplateSelect(template.id as TemplateID)}
                     className="h-4 w-4 text-[#4F46E5] focus:ring-[#4F46E5] border-gray-300"
+                    disabled={templateSaving}
                   />
-                  <span className="ml-2 text-sm font-medium text-gray-700">{template.name}</span>
+                  <span className={`ml-2 text-sm font-medium ${
+                    templateSaving ? 'text-gray-400' : 'text-gray-700'
+                  }`}>
+                    {template.name}
+                  </span>
+                  {selectedTemplate === template.id && authUser?.template !== template.id && (
+                    <span className="ml-2 text-xs text-orange-600 font-medium">
+                      (미저장)
+                    </span>
+                  )}
+                  {authUser?.template === template.id && (
+                    <span className="ml-2 text-xs text-green-600 font-medium">
+                      (현재 사용 중)
+                    </span>
+                  )}
                 </label>
               ))}
+            </div>
+
+            <div className="mt-4 text-sm text-gray-500">
+              <p>
+                ※ 템플릿을 선택한 후 "템플릿 저장" 버튼을 클릭하면 변경사항이 저장됩니다.
+              </p>
             </div>
           </div>
 
@@ -465,9 +570,7 @@ const DashboardPage: React.FC = () => {
               </div>
             ) : (
               <div className="p-6">
-                {/* Desktop-style Preview spanning full width */}
                 <div className="bg-gray-100 rounded-lg overflow-hidden">
-                  {/* Browser Header */}
                   <div className="bg-gray-200 px-4 py-2 flex items-center space-x-2">
                     <div className="flex space-x-1">
                       <div className="w-3 h-3 bg-red-400 rounded-full"></div>
@@ -475,13 +578,13 @@ const DashboardPage: React.FC = () => {
                       <div className="w-3 h-3 bg-green-400 rounded-full"></div>
                     </div>
                     <div className="flex-1 text-center">
-                      <span className="text-sm text-gray-600">{`linkhub.dev/${displayUser.username}`}</span>
+                      <span className="text-sm text-gray-600">
+                        {window.location.hostname}/{displayUser.username}
+                      </span>
                     </div>
-                    {/* Spacer for balance */}
                     <div className="w-16"></div>
                   </div>
                   
-                  {/* Content Area */}
                   <div className="bg-white" style={{ minHeight: '400px', maxHeight: '600px', overflow: 'auto' }}>
                     <PublicProfileContent 
                       user={displayUser} 
@@ -494,20 +597,66 @@ const DashboardPage: React.FC = () => {
                 <div className="mt-6 text-center space-y-2">
                   <div className="text-sm text-gray-600">
                     <p>현재 표시명: <strong>{displayUser.displayName}</strong></p>
-                    <p>사용자명: <strong>{displayUser.username}</strong></p>
+                    <p>사용자명: <strong className="text-blue-600">{displayUser.username}</strong></p>
+                    <p>공개 URL: <strong className="text-blue-600 font-mono text-xs">
+                      {window.location.origin}/#/profile/{displayUser.username}
+                    </strong></p>
                     <p>전체 링크: <strong>{links.length}개</strong></p>
                     <p>활성 링크: <strong className="text-green-600">{links.filter(l => l.isActive).length}개</strong></p>
                     <p>비활성 링크: <strong className="text-gray-500">{links.filter(l => !l.isActive).length}개</strong></p>
                   </div>
-                  <a
-                    href={`/#/profile/${displayUser.username}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#4F46E5] hover:bg-[#4338CA]"
-                  >
-                    <ExternalLinkIcon className="w-4 h-4 mr-2" />
-                    내 페이지 보기
-                  </a>
+                  
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center items-center pt-4">
+                    <button
+                      onClick={handleViewMyPage}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#4F46E5] hover:bg-[#4338CA] transition-colors"
+                      disabled={!displayUser.username}
+                    >
+                      <ExternalLinkIcon className="w-4 h-4 mr-2" />
+                      내 페이지 보기
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        const url = `${window.location.origin}/#/profile/${displayUser.username}`;
+                        navigator.clipboard.writeText(url).then(() => {
+                          alert('링크가 클립보드에 복사되었습니다!');
+                        }).catch(() => {
+                          alert('링크 복사에 실패했습니다.');
+                        });
+                      }}
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                      disabled={!displayUser.username}
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                      </svg>
+                      링크 복사
+                    </button>
+                    
+                    <button
+                      onClick={() => navigate('/profile/edit')}
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      프로필 수정
+                    </button>
+                  </div>
+                  
+                  {!displayUser.username || displayUser.username === 'username' ? (
+                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 text-yellow-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <p className="text-sm text-yellow-800">
+                          고유한 사용자명을 설정하여 개성 있는 프로필 URL을 만들어보세요!
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             )}

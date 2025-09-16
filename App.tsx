@@ -44,22 +44,31 @@ function App() {
       <LinkContext.Provider value={linkContextValue}>
         <HashRouter>
           <Routes>
+            {/* 공개 라우트 */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignUpPage />} />
+            
+            {/* 공개 프로필 페이지 - 사용자명으로 접근 (인증 불필요) */}
+            <Route path="/profile/:username" element={<PublicProfilePage />} />
 
+            {/* 보호된 라우트 */}
             <Route element={<ProtectedRouteWrapper />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/profile/:username" element={<PublicProfilePage />} />
+              
+              {/* 링크 관련 라우트 */}
               <Route path="/links/edit/:linkId" element={<LinkEditorPage />} />
               <Route path="/link/edit/:linkId" element={<LinkEditorPage />} />
               <Route path="/link/new" element={<LinkEditorPage />} />
+              
+              {/* 프로필 및 계정 관리 라우트 */}
               <Route path="/profile/edit" element={<ProfileEditPage />} />
               <Route path="/account/edit" element={<AccountEditPage />} />
               <Route path="/mypage" element={<MyPage />} />
             </Route>
 
+            {/* 기본 리디렉션 */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </HashRouter>

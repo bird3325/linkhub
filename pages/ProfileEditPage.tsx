@@ -5,7 +5,7 @@ import { PlusIcon } from '../components/icons/Icons';
 import { ProfileService } from '../utils/profileService';
 
 const ProfileEditPage: React.FC = () => {
-    const { user, setUser } = useContext(AuthContext);
+    const { user, setUser, refreshUserProfile } = useContext(AuthContext); // refreshUserProfile 추가
     const navigate = useNavigate();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -194,7 +194,9 @@ const ProfileEditPage: React.FC = () => {
                 setUser(updatedUser);
                 
                 // 헤더와 다른 컴포넌트들이 최신 프로필 정보를 반영하도록 새로고침
-                await refreshUserProfile();
+                if (refreshUserProfile) {
+                    await refreshUserProfile();
+                }
 
                 alert('프로필이 성공적으로 업데이트되었습니다.');
                 navigate('/dashboard');

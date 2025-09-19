@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useContext } from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Analytics } from "@vercel/analytics/react"
 
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
@@ -73,7 +74,8 @@ function App() {
           </Routes>
         </HashRouter>
       </LinkContext.Provider>
-    </AuthProvider>
+      <Analytics/>
+    </AuthProvider>    
   );
 }
 

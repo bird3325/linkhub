@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import type { User, Link as TLink } from '../types';
@@ -11,11 +11,94 @@ import { VisitorTracker } from '../utils/analytics';
 import { LinkService } from '../utils/linkService';
 import { ProfileService } from '../utils/profileService';
 
+// 스켈레톤 UI 컴포넌트들
+const LinkSkeleton: React.FC = () => (
+  <div className="animate-pulse">
+    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+      <div className="flex items-center space-x-4">
+        <div className="w-5 h-5 bg-gray-300 rounded"></div>
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gray-300 rounded"></div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <div className="h-4 bg-gray-300 rounded w-32"></div>
+              <div className="h-5 bg-gray-200 rounded-full w-12"></div>
+            </div>
+            <div className="h-3 bg-gray-200 rounded w-48 mt-1"></div>
+            <div className="h-2 bg-gray-200 rounded w-40 mt-1"></div>
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center space-x-4">
+        <div className="w-5 h-5 bg-gray-300 rounded"></div>
+        <div className="flex items-center space-x-2">
+          <div className="w-10 h-5 bg-gray-300 rounded-full"></div>
+          <div className="h-3 bg-gray-200 rounded w-8"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const LinkListSkeleton: React.FC = () => (
+  <div className="space-y-4">
+    {[...Array(3)].map((_, index) => (
+      <LinkSkeleton key={index} />
+    ))}
+  </div>
+);
+
+const PreviewSkeleton: React.FC = () => (
+  <div className="animate-pulse">
+    <div className="bg-gray-100 rounded-lg overflow-hidden">
+      <div className="bg-gray-200 px-4 py-2 flex items-center space-x-2">
+        <div className="flex space-x-1">
+          <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
+          <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
+          <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
+        </div>
+        <div className="flex-1 text-center">
+          <div className="h-3 bg-gray-300 rounded w-40 mx-auto"></div>
+        </div>
+        <div className="w-16"></div>
+      </div>
+      
+      <div className="bg-white p-8" style={{ minHeight: '400px' }}>
+        {/* 프로필 헤더 스켈레톤 */}
+        <div className="text-center mb-8">
+          <div className="w-24 h-24 bg-gray-300 rounded-full mx-auto mb-4"></div>
+          <div className="h-6 bg-gray-300 rounded w-32 mx-auto mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded w-48 mx-auto mb-1"></div>
+          <div className="h-4 bg-gray-200 rounded w-40 mx-auto"></div>
+        </div>
+        
+        {/* 링크 스켈레톤 */}
+        <div className="space-y-3 max-w-md mx-auto">
+          {[...Array(4)].map((_, index) => (
+            <div key={index} className="h-12 bg-gray-300 rounded-lg"></div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const HeaderSkeleton: React.FC = () => (
+  <div className="animate-pulse">
+    <div className="flex justify-between items-center mb-6">
+      <div className="h-6 bg-gray-300 rounded w-32"></div>
+      <div className="h-9 bg-gray-300 rounded w-28"></div>
+    </div>
+  </div>
+);
+
 const DashboardPage: React.FC = () => {
   const [profileLoading, setProfileLoading] = useState(true);
   const [linksLoading, setLinksLoading] = useState(true);
   const [displayUser, setDisplayUser] = useState<User | null>(null);
   const [toggleLoading, setToggleLoading] = useState<{ [key: string]: boolean }>({});
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  
   const { links, setLinks } = useContext(LinkContext);
   const { user: authUser, setUser } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -23,8 +106,8 @@ const DashboardPage: React.FC = () => {
   const dragItem = React.useRef<number | null>(null);
   const dragOverItem = React.useRef<number | null>(null);
 
-  // 기본값이 포함된 사용자 정보 생성 함수
-  const createDisplayUser = (authUser: any, profileData?: any): User => {
+  // 기본값이 포함된 사용자 정보 생성 함수 (메모이제이션)
+  const createDisplayUser = useCallback((authUser: any, profileData?: any): User => {
     if (!authUser) {
       return {
         id: '',
@@ -57,16 +140,16 @@ const DashboardPage: React.FC = () => {
       template: authUser.template || 'Glass' as any,
       signupDate: authUser.signupDate
     };
-  };
+  }, []);
 
   // 새 링크 추가 버튼 핸들러
-  const handleAddNewLink = () => {
+  const handleAddNewLink = useCallback(() => {
     console.log('새 링크 추가 버튼 클릭됨');
     navigate('/link/new');
-  };
+  }, [navigate]);
 
   // 내 페이지 보기 핸들러
-  const handleViewMyPage = () => {
+  const handleViewMyPage = useCallback(() => {
     if (!displayUser?.username) {
       alert('사용자명이 설정되지 않았습니다. 프로필을 먼저 설정해주세요.');
       navigate('/profile/edit');
@@ -78,98 +161,89 @@ const DashboardPage: React.FC = () => {
     
     console.log('내 페이지 링크:', profileUrl);
     window.open(profileUrl, '_blank', 'noopener,noreferrer');
-  };
+  }, [displayUser?.username, navigate]);
 
-  // 프로필 정보 로드
+  // 병렬 데이터 로딩 (프로필 + 링크 동시 처리)
   useEffect(() => {
-    const loadProfile = async () => {
+    const loadInitialData = async () => {
       if (!authUser?.email) {
-        console.log('로그인된 사용자가 없어 프로필 로드 건너뜀');
+        console.log('로그인된 사용자가 없어 데이터 로드 건너뜀');
         setDisplayUser(createDisplayUser(authUser));
+        setLinks([]);
         setProfileLoading(false);
+        setLinksLoading(false);
+        setInitialLoadComplete(true);
         return;
       }
 
       try {
-        setProfileLoading(true);
-        console.log('구글 시트에서 프로필 정보 로드 시작');
+        console.log('프로필 및 링크 데이터 병렬 로딩 시작');
         
-        const result = await ProfileService.getProfile(authUser.id, undefined, authUser.email);
-        
-        if (result.success && result.profile) {
-          console.log('구글 시트에서 프로필 로드 성공:', result.profile);
+        // 프로필과 링크를 동시에 로드
+        const [profileResult, linksResult] = await Promise.allSettled([
+          ProfileService.getProfile(authUser.id, undefined, authUser.email),
+          LinkService.getLinks(authUser.id, authUser.email)
+        ]);
+
+        // 프로필 처리
+        if (profileResult.status === 'fulfilled' && profileResult.value.success && profileResult.value.profile) {
+          console.log('구글 시트에서 프로필 로드 성공:', profileResult.value.profile);
           
           const updatedAuthUser = {
             ...authUser,
-            displayName: result.profile.displayName || authUser.displayName || authUser.name,
-            username: result.profile.username || authUser.username || authUser.email?.split('@')[0],
-            bio: result.profile.bio || authUser.bio,
-            avatar: result.profile.avatar || authUser.avatar,
-            template: result.profile.template || authUser.template || 'Glass'
+            displayName: profileResult.value.profile.displayName || authUser.displayName || authUser.name,
+            username: profileResult.value.profile.username || authUser.username || authUser.email?.split('@')[0],
+            bio: profileResult.value.profile.bio || authUser.bio,
+            avatar: profileResult.value.profile.avatar || authUser.avatar,
+            template: profileResult.value.profile.template || authUser.template || 'Glass'
           };
           
           setUser(updatedAuthUser);
-          const createdUser = createDisplayUser(authUser, result.profile);
+          const createdUser = createDisplayUser(authUser, profileResult.value.profile);
           setDisplayUser(createdUser);
         } else {
           console.log('구글 시트에 프로필이 없음, 기본값 사용');
           const createdUser = createDisplayUser(authUser);
           setDisplayUser(createdUser);
         }
-      } catch (error) {
-        console.warn('프로필 로드 실패:', error);
-        const createdUser = createDisplayUser(authUser);
-        setDisplayUser(createdUser);
-      } finally {
-        setProfileLoading(false);
-      }
-    };
 
-    loadProfile();
-  }, [authUser?.id, authUser?.email, setUser]);
-
-  // 방문자 추적 로그 기록
-  useEffect(() => {
-    if (authUser) {
-      console.log('대시보드 방문 로그 기록 (로그인 사용자):', authUser);
-      VisitorTracker.logVisit('/dashboard', undefined, true);
-    }
-  }, [authUser]);
-
-  // 링크 데이터 로드
-  useEffect(() => {
-    const loadLinks = async () => {
-      if (!authUser?.id) {
-        console.log('로그인된 사용자가 없어 링크 로드 건너뜀');
-        setLinks([]);
-        setLinksLoading(false);
-        return;
-      }
-
-      try {
-        setLinksLoading(true);
-        console.log('구글 시트에서 링크 로드 시작');
-        const googleLinks = await LinkService.getLinks(authUser.id, authUser.email);
-        
-        if (googleLinks && googleLinks.length > 0) {
-          console.log('구글 시트에서 링크 로드 성공:', googleLinks.length, '개');
-          setLinks(googleLinks);
+        // 링크 처리
+        if (linksResult.status === 'fulfilled' && linksResult.value && linksResult.value.length > 0) {
+          console.log('구글 시트에서 링크 로드 성공:', linksResult.value.length, '개');
+          setLinks(linksResult.value);
         } else {
           console.log('구글 시트에 링크가 없음, 빈 배열 설정');
           setLinks([]);
         }
+
       } catch (error) {
-        console.warn('링크 로드 실패:', error);
+        console.warn('데이터 로드 실패:', error);
+        const createdUser = createDisplayUser(authUser);
+        setDisplayUser(createdUser);
         setLinks([]);
       } finally {
+        setProfileLoading(false);
         setLinksLoading(false);
+        setInitialLoadComplete(true);
       }
     };
 
-    loadLinks();
-  }, [authUser, setLinks]);
+    loadInitialData();
+  }, [authUser?.id, authUser?.email, setUser, setLinks, createDisplayUser]);
 
-  const handleSort = async () => {
+  // 방문자 추적 로그 기록 (최적화 - 한번만 실행)
+  useEffect(() => {
+    if (authUser && initialLoadComplete) {
+      console.log('대시보드 방문 로그 기록 (로그인 사용자):', authUser);
+      // 비동기로 처리하여 UI 블로킹 방지
+      setTimeout(() => {
+        VisitorTracker.logVisit('/dashboard', undefined, true);
+      }, 100);
+    }
+  }, [authUser, initialLoadComplete]);
+
+  // 드래그 정렬 최적화
+  const handleSort = useCallback(async () => {
     if(dragItem.current === null || dragOverItem.current === null || !authUser?.id) return;
 
     let _links = [...links];
@@ -182,20 +256,24 @@ const DashboardPage: React.FC = () => {
     const reorderedLinks = _links.map((link, index) => ({ ...link, order: index + 1 }));
     setLinks(reorderedLinks);
 
+    // 서버 업데이트를 비동기로 처리
     try {
       const linkOrders: { [key: string]: number } = {};
       reorderedLinks.forEach((link, index) => {
         linkOrders[link.id] = index + 1;
       });
-      await LinkService.updateLinkOrders(authUser.id, linkOrders, authUser.email);
-      console.log('링크 순서 구글 시트에 업데이트됨');
+      
+      // 백그라운드에서 업데이트
+      LinkService.updateLinkOrders(authUser.id, linkOrders, authUser.email)
+        .then(() => console.log('링크 순서 구글 시트에 업데이트됨'))
+        .catch(error => console.warn('링크 순서 업데이트 실패:', error));
     } catch (error) {
       console.warn('링크 순서 업데이트 실패:', error);
     }
-  };
+  }, [links, authUser?.id, authUser?.email, setLinks]);
 
-  // 링크 활성/비활성 토글
-  const handleToggleActive = async (linkId: string, isActive: boolean) => {
+  // 링크 활성/비활성 토글 최적화
+  const handleToggleActive = useCallback(async (linkId: string, isActive: boolean) => {
     console.log('링크 활성 상태 변경 시작:', { linkId, isActive });
 
     if (!authUser?.id) {
@@ -219,6 +297,7 @@ const DashboardPage: React.FC = () => {
     setToggleLoading(prev => ({ ...prev, [linkId]: true }));
 
     const originalLinks = [...links];
+    // 즉시 UI 업데이트 (낙관적 업데이트)
     setLinks(links.map(link => 
       link.id === linkId ? { ...link, isActive } : link
     ));
@@ -236,16 +315,15 @@ const DashboardPage: React.FC = () => {
           isActive,
           title: targetLink.title
         });
-        
-        console.log(`${targetLink.title}이(가) ${isActive ? '공개' : '비공개'}되었습니다.`);
-        
       } else {
         console.warn('서버에서 실패 응답:', result.message);
+        // 실패 시 원복
         setLinks(originalLinks);
         alert(`링크 ${isActive ? '공개' : '비공개'} 설정에 실패했습니다.\n${result.message || '알 수 없는 오류'}`);
       }
     } catch (error: any) {
       console.error('링크 활성 상태 변경 오류:', error);
+      // 오류 시 원복
       setLinks(originalLinks);
       
       let errorMessage = '링크 상태 변경 중 오류가 발생했습니다.';
@@ -259,27 +337,86 @@ const DashboardPage: React.FC = () => {
       }
       
       alert(errorMessage);
-      
     } finally {
+      // 로딩 상태 해제를 지연
       setTimeout(() => {
         setToggleLoading(prev => {
           const newState = { ...prev };
           delete newState[linkId];
           return newState;
         });
-      }, 500);
+      }, 300); // 줄어든 지연 시간
     }
-  };
+  }, [links, authUser?.id, setLinks]);
 
-  // displayUser가 null일 때 로딩 상태 표시
+  // 활성 링크만 필터링 (메모이제이션)
+  const activeLinks = useMemo(() => {
+    return links.filter(l => l.isActive);
+  }, [links]);
+
+  // 초기 로딩 상태 - 스켈레톤 UI 적용
+  if (!initialLoadComplete) {
+    return (
+      <div className="min-h-screen bg-gray-100">
+        <Header />
+        <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="max-w-4xl mx-auto">
+            
+            {/* Links Management Section Skeleton */}
+            <div className="bg-white rounded-lg shadow p-6 mb-8">
+              <HeaderSkeleton />
+              <LinkListSkeleton />
+            </div>
+
+            {/* Preview Section Skeleton */}
+            <div className="bg-white rounded-lg shadow">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="animate-pulse">
+                  <div className="h-6 bg-gray-300 rounded w-20 mb-1"></div>
+                  <div className="h-4 bg-gray-200 rounded w-80"></div>
+                </div>
+              </div>
+              <div className="p-6">
+                <PreviewSkeleton />
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // displayUser가 null일 때도 스켈레톤 표시
   if (!displayUser) {
     return (
       <div className="min-h-screen bg-gray-100">
         <Header />
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4F46E5] mx-auto mb-4"></div>
-            <p className="text-gray-600">사용자 정보를 불러오는 중...</p>
+          <div className="max-w-4xl mx-auto">
+            
+            {/* Links Management Section Skeleton */}
+            <div className="bg-white rounded-lg shadow p-6 mb-8">
+              <HeaderSkeleton />
+              <div className="animate-pulse">
+                <div className="text-center py-8">
+                  <div className="h-5 bg-gray-300 rounded w-48 mx-auto mb-4"></div>
+                  <div className="h-9 bg-gray-300 rounded w-36 mx-auto"></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Preview Section Skeleton */}
+            <div className="bg-white rounded-lg shadow">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="animate-pulse">
+                  <div className="h-6 bg-gray-300 rounded w-20 mb-1"></div>
+                  <div className="h-4 bg-gray-200 rounded w-80"></div>
+                </div>
+              </div>
+              <div className="p-6">
+                <PreviewSkeleton />
+              </div>
+            </div>
           </div>
         </main>
       </div>
@@ -307,10 +444,7 @@ const DashboardPage: React.FC = () => {
             </div>
 
             {linksLoading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4F46E5] mx-auto mb-4"></div>
-                <p className="text-gray-500">링크를 불러오는 중...</p>
-              </div>
+              <LinkListSkeleton />
             ) : links.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-500 mb-4">아직 추가된 링크가 없습니다.</p>
@@ -349,6 +483,7 @@ const DashboardPage: React.FC = () => {
                               const target = e.target as HTMLImageElement;
                               target.style.display = 'none';
                             }}
+                            loading="lazy" // 지연 로딩 추가
                           />
                         )}
                         <div>
@@ -419,9 +554,8 @@ const DashboardPage: React.FC = () => {
             </div>
             
             {profileLoading ? (
-              <div className="p-6 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4F46E5] mx-auto mb-4"></div>
-                <p className="text-gray-500">프로필 정보를 불러오는 중...</p>
+              <div className="p-6">
+                <PreviewSkeleton />
               </div>
             ) : (
               <div className="p-6">
@@ -443,7 +577,7 @@ const DashboardPage: React.FC = () => {
                   <div className="bg-white" style={{ minHeight: '400px', maxHeight: '600px', overflow: 'auto' }}>
                     <PublicProfileContent 
                       user={displayUser} 
-                      links={links.filter(l => l.isActive)} 
+                      links={activeLinks} // 메모이제이션된 활성 링크만 전달
                       isPreview={true}
                     />
                   </div>

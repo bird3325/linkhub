@@ -32,6 +32,110 @@ export class ProfileService {
     });
   }
 
+  // 프로필과 링크를 동시에 가져오는 새로운 메서드 (최적화 - 새로 추가)
+  static async getProfileAndLinks(userId?: string | number, username?: string, userEmail?: string) {
+    this.log('프로필 및 링크 동시 조회 시작', { userId, username, userEmail });
+    
+    if (!this.scriptUrl) {
+      throw new Error('앱스 스크립트 URL이 설정되지 않았습니다.');
+    }
+    
+    try {
+      // 안전한 문자열 변환
+      const userIdStr = userId ? String(userId).trim() : '';
+      
+      const requestData = {
+        action: 'get_profile_and_links',
+        userId: userIdStr || null,
+        username: username || null,
+        userEmail: userEmail || null
+      };
+
+      this.log('배치 조회 요청 데이터', requestData);
+
+      // 타임아웃 설정 (40초 - 배치 처리이므로 더 길게)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 40000);
+
+      const response = await fetch(this.scriptUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(requestData),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, text: ${errorText}`);
+      }
+
+      const responseText = await response.text();
+      this.log('배치 조회 원시 응답', responseText);
+
+      if (!responseText || responseText.trim() === '') {
+        throw new Error('서버에서 빈 응답을 받았습니다.');
+      }
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        this.error('배치 조회 JSON 파싱 오류', { responseText, parseError });
+        throw new Error('서버 응답을 파싱할 수 없습니다: ' + responseText.substring(0, 200));
+      }
+      
+      if (result.success) {
+        this.log('프로필 및 링크 동시 조회 성공', {
+          hasProfile: !!result.profile,
+          linksCount: result.links?.length || 0,
+          processingTime: result.processingTime
+        });
+        
+        // 성공시 캐시 업데이트 (프로필이 있는 경우만)
+        if (result.profile && result.profile.userId) {
+          this.setCachedProfile(String(result.profile.userId), result.profile);
+        }
+        
+        return {
+          success: true,
+          profile: result.profile,
+          links: result.links || [],
+          processingTime: result.processingTime
+        };
+      } else {
+        this.error('프로필 및 링크 동시 조회 실패', result.message);
+        return {
+          success: false,
+          error: result.message,
+          profile: null,
+          links: []
+        };
+      }
+    } catch (error: any) {
+      this.error('프로필 및 링크 동시 조회 중 오류', error);
+      
+      // 에러 타입별 구체적 처리
+      if (error.name === 'AbortError') {
+        throw new Error('요청 시간이 초과되었습니다. 다시 시도해주세요.');
+      }
+      
+      if (error.message.includes('Failed to fetch') || error.message.includes('fetch')) {
+        throw new Error('네트워크 연결 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
+      }
+      
+      return {
+        success: false,
+        error: error.message,
+        profile: null,
+        links: []
+      };
+    }
+  }
+
   // 프로필 저장
   static async saveProfile(profileData: {
     userId?: string | number;
@@ -138,10 +242,14 @@ export class ProfileService {
       const userEmailStr = userEmail ? String(userEmail).trim() : '';
 
       const requestData = {
-        action: 'update_profile',
+        action: 'save_profile', // update_profile 대신 save_profile 사용 (통합)
         userId: userIdStr,
         userEmail: userEmailStr,
-        ...updateData
+        displayName: updateData.displayName,
+        username: updateData.username,
+        bio: updateData.bio,
+        avatar: updateData.avatar,
+        template: updateData.template
       };
 
       this.log('프로필 업데이트 요청 데이터', requestData);
@@ -296,13 +404,152 @@ export class ProfileService {
     }
   }
 
+  // 배치 처리를 위한 헬퍼 메서드 (추가)
+  static async batchRequest(requests: Array<{
+    action: string;
+    data: any;
+  }>) {
+    this.log('배치 요청 시작', requests);
+    
+    if (!this.scriptUrl) {
+      throw new Error('앱스 스크립트 URL이 설정되지 않았습니다.');
+    }
+
+    try {
+      const requestData = {
+        action: 'batch_request',
+        requests: requests
+      };
+
+      const response = await fetch(this.scriptUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`배치 요청 서버 오류 (${response.status}): ${errorText || response.statusText}`);
+      }
+
+      const responseText = await response.text();
+      this.log('배치 요청 응답', responseText);
+
+      if (!responseText) {
+        throw new Error('서버에서 빈 응답을 받았습니다.');
+      }
+
+      const result = JSON.parse(responseText);
+      return result;
+
+    } catch (error) {
+      this.error('배치 요청 오류', error);
+      throw error;
+    }
+  }
+
+  // 성능 측정을 위한 메서드 (추가)
+  static async measurePerformance<T>(
+    operation: () => Promise<T>,
+    operationName: string
+  ): Promise<{ result: T; duration: number }> {
+    const startTime = performance.now();
+    
+    try {
+      const result = await operation();
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+      
+      this.log(`성능 측정 - ${operationName}`, {
+        duration: `${duration.toFixed(2)}ms`,
+        success: true
+      });
+      
+      return { result, duration };
+    } catch (error) {
+      const endTime = performance.now();
+      const duration = endTime - startTime;
+      
+      this.error(`성능 측정 - ${operationName} (실패)`, {
+        duration: `${duration.toFixed(2)}ms`,
+        error: error
+      });
+      
+      throw error;
+    }
+  }
+
+  // 캐시 상태 조회 (디버깅용)
+  static getCacheStats() {
+    const stats = {
+      totalCached: this.profileCache.size,
+      cacheTimeout: this.cacheTimeout,
+      cacheEntries: Array.from(this.profileCache.entries()).map(([key, value]) => ({
+        userId: key,
+        cachedAt: new Date(value.timestamp).toISOString(),
+        isExpired: Date.now() - value.timestamp >= this.cacheTimeout
+      }))
+    };
+    
+    this.log('캐시 상태', stats);
+    return stats;
+  }
+
+  // 만료된 캐시 정리
+  static cleanExpiredCache() {
+    const now = Date.now();
+    let cleanedCount = 0;
+    
+    for (const [key, value] of this.profileCache.entries()) {
+      if (now - value.timestamp >= this.cacheTimeout) {
+        this.profileCache.delete(key);
+        cleanedCount++;
+      }
+    }
+    
+    if (cleanedCount > 0) {
+      this.log('만료된 캐시 정리 완료', { cleanedCount });
+    }
+    
+    return cleanedCount;
+  }
+
   // 캐시 클리어
   static clearCache(userId?: string | number) {
     if (userId) {
       const userIdStr = String(userId);
       this.profileCache.delete(userIdStr);
+      this.log('특정 사용자 캐시 삭제', { userId: userIdStr });
     } else {
       this.profileCache.clear();
+      this.log('전체 캐시 삭제');
     }
+  }
+
+  // 캐시 예열 (미리 자주 사용되는 프로필 로드)
+  static async warmupCache(userIds: string[]) {
+    this.log('캐시 예열 시작', { userIds });
+    
+    const promises = userIds.map(async (userId) => {
+      try {
+        await this.getProfile(userId);
+        return { userId, success: true };
+      } catch (error) {
+        this.error(`캐시 예열 실패 - 사용자 ${userId}`, error);
+        return { userId, success: false, error: error };
+      }
+    });
+    
+    const results = await Promise.allSettled(promises);
+    const stats = {
+      total: userIds.length,
+      success: results.filter(r => r.status === 'fulfilled').length,
+      failed: results.filter(r => r.status === 'rejected').length
+    };
+    
+    this.log('캐시 예열 완료', stats);
+    return stats;
   }
 }

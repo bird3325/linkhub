@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useContext } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Analytics } from "@vercel/analytics/react";
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
@@ -16,7 +17,7 @@ import type { Link } from './types';
 
 const ProtectedRoute: React.FC<{ isAuthenticated: boolean }> = ({ isAuthenticated }) => {
   if (!isAuthenticated) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/login" replace />;
   }
   return <Outlet />;
 };
@@ -28,7 +29,6 @@ const ProtectedRouteWrapper: React.FC = () => {
 };
 
 function App() {
-  // MOCK_LINKS 제거, 빈 배열로 초기화
   const [links, setLinks] = useState<Link[]>([]);
   
   const linkContextValue = useMemo(() => ({
@@ -41,39 +41,37 @@ function App() {
       <LinkContext.Provider value={linkContextValue}>
         <BrowserRouter>
           <Routes>
-            {/* 공개 라우트 */}
+            {/* 정적 공개 라우트 (우선순위 높음) */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignUpPage />} />
             
-            {/* 보호된 라우트 */}
+            {/* 관리자 라우트 (보호됨) */}
             <Route element={<ProtectedRouteWrapper />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/mypage" element={<MyPage />} />
               
               {/* 링크 관련 라우트 */}
               <Route path="/link/new" element={<LinkEditorPage />} />
               <Route path="/link/edit/:linkId" element={<LinkEditorPage />} />
-              <Route path="/mypage" element={<MyPage />} />
               
               {/* 프로필 및 계정 관리 라우트 */}
               <Route path="/profile/edit" element={<ProfileEditPage />} />
               <Route path="/account/edit" element={<AccountEditPage />} />
               
-              {/* 보호된 프로필 페이지 (관리용) */}
-              <Route path="/profile/:username" element={<PublicProfilePage />} />
+              {/* 관리자용 프로필 보기 */}
+              <Route path="/admin/profile/:username" element={<PublicProfilePage />} />
             </Route>
             
-            {/* 공개 프로필 페이지 - 사용자명으로 직접 접근 (맨 마지막에 배치) */}
+            {/* 동적 공개 프로필 라우트 (마지막에 배치) */}
             <Route path="/:username" element={<PublicProfilePage />} />
             
-            {/* 기본 리디렉션 */}
-            <Route path="*" element={<Navigate to="/" />} />
-
             {/* 404 처리 */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
+        <Analytics />
       </LinkContext.Provider>
     </AuthProvider>
   );

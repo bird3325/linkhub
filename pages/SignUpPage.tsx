@@ -202,7 +202,7 @@ const SignUpPage: React.FC = () => {
             <LogoIcon className="h-12 w-auto text-[#4F46E5]" />
           </Link>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            LinkHub에 가입하기
+            linkitda에 가입하기
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             이미 계정이 있으신가요?{' '}
@@ -342,7 +342,7 @@ const SignUpPage: React.FC = () => {
         </div>
         <p className="mt-6 text-center text-xs text-gray-500">
           <Link to="/" className="hover:underline">
-            Powered by LinkHub
+            Powered by linkitda
           </Link>
         </p>
       </div>

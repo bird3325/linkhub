@@ -27,7 +27,7 @@ const MyPage: React.FC = () => {
             <div className="flex-1 overflow-y-auto">
                 <PublicProfileContent user={user} links={links} />
                 <footer className="text-center py-4">
-                    <Link to="/" className="text-gray-500 font-semibold hover:text-[#4F46E5]">Powered by LinkHub</Link>
+                    <Link to="/" className="text-gray-500 font-semibold hover:text-[#4F46E5]">Powered by linkitda</Link>
                 </footer>
             </div>
         </div>

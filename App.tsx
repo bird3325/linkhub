@@ -16,7 +16,7 @@ import type { Link } from './types';
 
 const ProtectedRoute: React.FC<{ isAuthenticated: boolean }> = ({ isAuthenticated }) => {
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" />;
   }
   return <Outlet />;
 };
@@ -46,9 +46,6 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignUpPage />} />
             
-            {/* 공개 프로필 페이지 - 사용자명으로 직접 접근 (인증 불필요) */}
-            <Route path="/:username" element={<PublicProfilePage />} />
-            
             {/* 보호된 라우트 */}
             <Route element={<ProtectedRouteWrapper />}>
               <Route path="/dashboard" element={<DashboardPage />} />
@@ -59,14 +56,19 @@ function App() {
               <Route path="/link/edit/:linkId" element={<LinkEditorPage />} />
               <Route path="/mypage" element={<MyPage />} />
               
-              {/* 프로필 및 계정 관리 라우트 - 해시 라우트로 변경 */}
+              {/* 프로필 및 계정 관리 라우트 */}
               <Route path="/profile/edit" element={<ProfileEditPage />} />
               <Route path="/account/edit" element={<AccountEditPage />} />
+              
+              {/* 보호된 프로필 페이지 (관리용) */}
               <Route path="/profile/:username" element={<PublicProfilePage />} />
             </Route>
             
+            {/* 공개 프로필 페이지 - 사용자명으로 직접 접근 (맨 마지막에 배치) */}
+            <Route path="/:username" element={<PublicProfilePage />} />
+            
             {/* 기본 리디렉션 */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </BrowserRouter>
       </LinkContext.Provider>

@@ -156,19 +156,19 @@ const DashboardPage: React.FC = () => {
       return;
     }
     
-    // 기본 사용자명인 경우 경고
     if (displayUser.username === 'username') {
       alert('고유한 사용자명을 설정해야 공개 페이지를 볼 수 있습니다. 프로필을 수정해주세요.');
       navigate('/profile/edit');
       return;
     }
     
-    // https://linkitda.vercel.app/사용자명 형태로 URL 생성
+    // 깔끔한 URL 형태
     const profileUrl = `https://linkitda.vercel.app/${displayUser.username}`;
     
     console.log('내 페이지 링크:', profileUrl);
     window.open(profileUrl, '_blank', 'noopener,noreferrer');
   }, [displayUser?.username, navigate]);
+
 
   // 병렬 데이터 로딩 (프로필 + 링크 동시 처리)
   useEffect(() => {

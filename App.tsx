@@ -69,6 +69,9 @@ function App() {
             
             {/* 기본 리디렉션 */}
             <Route path="*" element={<Navigate to="/" />} />
+
+            {/* 404 처리 */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
       </LinkContext.Provider>

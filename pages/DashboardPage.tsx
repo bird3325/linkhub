@@ -148,7 +148,7 @@ const DashboardPage: React.FC = () => {
     navigate('/link/new');
   }, [navigate]);
 
-  // 내 페이지 보기 핸들러
+  // 내 페이지 보기 핸들러 (수정됨 - 직접 URL 형태로 변경)
   const handleViewMyPage = useCallback(() => {
     if (!displayUser?.username) {
       alert('사용자명이 설정되지 않았습니다. 프로필을 먼저 설정해주세요.');
@@ -156,8 +156,15 @@ const DashboardPage: React.FC = () => {
       return;
     }
     
-    const currentDomain = window.location.origin;
-    const profileUrl = `${currentDomain}/#/profile/${displayUser.username}`;
+    // 기본 사용자명인 경우 경고
+    if (displayUser.username === 'username') {
+      alert('고유한 사용자명을 설정해야 공개 페이지를 볼 수 있습니다. 프로필을 수정해주세요.');
+      navigate('/profile/edit');
+      return;
+    }
+    
+    // https://linkitda.vercel.app/사용자명 형태로 URL 생성
+    const profileUrl = `https://linkitda.vercel.app/${displayUser.username}`;
     
     console.log('내 페이지 링크:', profileUrl);
     window.open(profileUrl, '_blank', 'noopener,noreferrer');
@@ -568,7 +575,7 @@ const DashboardPage: React.FC = () => {
                     </div>
                     <div className="flex-1 text-center">
                       <span className="text-sm text-gray-600">
-                        {window.location.hostname}/{displayUser.username}
+                        linkitda.vercel.app/{displayUser.username}
                       </span>
                     </div>
                     <div className="w-16"></div>
@@ -588,7 +595,7 @@ const DashboardPage: React.FC = () => {
                     <button
                       onClick={handleViewMyPage}
                       className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#4F46E5] hover:bg-[#4338CA] transition-colors"
-                      disabled={!displayUser.username}
+                      disabled={!displayUser.username || displayUser.username === 'username'}
                     >
                       <ExternalLinkIcon className="w-4 h-4 mr-2" />
                       내 페이지 보기
@@ -603,10 +610,18 @@ const DashboardPage: React.FC = () => {
                         </svg>
                         <p className="text-sm text-yellow-800">
                           고유한 사용자명을 설정하여 개성 있는 프로필 URL을 만들어보세요!
+                          <br />
+                          <strong>linkitda.vercel.app/[사용자명]</strong> 형태로 공개됩니다.
                         </p>
                       </div>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-500">
+                        공개 URL: <span className="font-mono text-blue-600">https://linkitda.vercel.app/{displayUser.username}</span>
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

@@ -89,6 +89,7 @@ export class LinkService {
     userEmail?: string;
     title: string;
     url: string;
+    category?: string;
     description?: string;
     imageUrl?: string;
     style?: string;
@@ -256,6 +257,7 @@ export class LinkService {
           userId: String(link.userId), // 문자열로 변환
           title: link.title,
           url: link.url,
+          category: link.category || undefined,
           style: link.style,
           imageUrl: link.imageUrl || undefined,
           isActive: Boolean(link.isActive),
@@ -285,6 +287,7 @@ export class LinkService {
     data: {
       title?: string;
       url?: string;
+      category?: string;
       description?: string;
       imageUrl?: string;
       style?: string;
@@ -350,6 +353,7 @@ export class LinkService {
   static async updateLink(linkId: string, linkData: {
     title?: string;
     url?: string;
+    category?: string;
     description?: string;
     imageUrl?: string;
     style?: string;
@@ -611,6 +615,7 @@ export class LinkService {
   static validateLinkData(linkData: {
     title?: string;
     url?: string;
+    category?: string;
     description?: string;
   }): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
@@ -633,6 +638,10 @@ export class LinkService {
           errors.push('유효하지 않은 URL 형식입니다.');
         }
       }
+    }
+
+    if (linkData.category !== undefined && linkData.category.length > 20) {
+      errors.push('카테고리는 20자를 초과할 수 없습니다.');
     }
     
     if (linkData.description !== undefined && linkData.description.length > 500) {

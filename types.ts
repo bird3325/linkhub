@@ -28,9 +28,11 @@ export interface User {
 
 export interface Link {
   id: string;
-  userId: string; // 항상 문자열로 변환하여 저장
+  userId: string;
   title: string;
   url: string;
+  category?: string; 
+  description?: string;
   style: LinkStyle;
   imageUrl?: string;
   isActive: boolean;

@@ -6,7 +6,7 @@ import { VisitorTracker } from '../utils/analytics';
 import { ProfileService } from '../utils/profileService';
 import { LinkService } from '../utils/linkService';
 
-// 스켈레톤 로딩 컴포넌트 (쇼핑몰 스타일)
+// 스켈레톤 로딩 컴포넌트 (쇼핑몰 스타일) - 기존과 동일
 const ProfileSkeleton: React.FC = React.memo(() => (
   <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
     {/* 헤더 스켈레톤 */}
@@ -39,9 +39,12 @@ const ProfileSkeleton: React.FC = React.memo(() => (
               <div className="h-6 bg-gray-300 rounded w-32 mx-auto mb-2"></div>
               <div className="h-4 bg-gray-200 rounded w-40 mx-auto"></div>
             </div>
-            <div className="space-y-3">
-              <div className="h-4 bg-gray-200 rounded"></div>
-              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            {/* ✅ 카테고리 메뉴 스켈레톤 */}
+            <div className="space-y-2">
+              <div className="h-4 bg-gray-300 rounded w-20 mb-3"></div>
+              <div className="h-8 bg-gray-200 rounded"></div>
+              <div className="h-8 bg-gray-200 rounded"></div>
+              <div className="h-8 bg-gray-200 rounded"></div>
             </div>
           </div>
         </div>
@@ -71,7 +74,7 @@ const ProfileSkeleton: React.FC = React.memo(() => (
   </div>
 ));
 
-// 프리미엄 스타일 푸터
+// 프리미엄 스타일 푸터 - 기존과 동일
 const PoweredByFooter: React.FC = React.memo(() => (
   <footer className="bg-slate-50 border-t border-gray-100 mt-16">
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -103,7 +106,7 @@ const PoweredByFooter: React.FC = React.memo(() => (
   </footer>
 ));
 
-// 에러 페이지 (쇼핑몰 스타일)
+// 에러 페이지 (쇼핑몰 스타일) - 기존과 동일
 const ErrorPage: React.FC<{ error: string; username?: string }> = React.memo(({ error, username }) => (
   <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
     <div className="flex items-center justify-center min-h-screen px-4">
@@ -161,6 +164,8 @@ const PublicProfilePage: React.FC = () => {
   const [links, setLinks] = useState<TLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // ✅ 카테고리 필터 상태 추가
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   const handleLinkClick = useCallback((link: TLink) => {
     console.log('링크 클릭:', link);
@@ -168,6 +173,11 @@ const PublicProfilePage: React.FC = () => {
     setTimeout(() => {
       VisitorTracker.logLinkClick(link.id, link.title, link.url);
     }, 0);
+  }, []);
+
+  // ✅ 카테고리 필터 핸들러
+  const handleCategoryFilter = useCallback((category: string) => {
+    setSelectedCategory(category);
   }, []);
 
   useEffect(() => {
@@ -295,6 +305,8 @@ const PublicProfilePage: React.FC = () => {
           links={memoizedLinks}
           isPreview={false}
           onLinkClick={handleLinkClick}
+          selectedCategory={selectedCategory} // ✅ 카테고리 필터 전달
+          onCategoryFilter={handleCategoryFilter} // ✅ 카테고리 필터 핸들러 전달
         />
       </div>
       <PoweredByFooter />
